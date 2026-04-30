@@ -5,7 +5,13 @@ import { createSupabaseBrowserClient } from "@/lib/supabase";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-export default function Sidebar({ seller }: { seller: Seller }) {
+export default function Sidebar({
+  seller,
+  pendingOrderCount,
+}: {
+  seller: Seller;
+  pendingOrderCount: number;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
@@ -43,7 +49,12 @@ export default function Sidebar({ seller }: { seller: Seller }) {
               }`}
             >
               <span>{it.icon}</span>
-              {it.label}
+              <span className="flex-1">{it.label}</span>
+              {it.href === "/dashboard" && pendingOrderCount > 0 && (
+                <span className="min-w-[1.25rem] rounded-full bg-[#FF6B35] px-1.5 py-0.5 text-center text-[10px] font-bold text-black">
+                  {pendingOrderCount > 99 ? "99+" : pendingOrderCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -61,10 +72,15 @@ export default function Sidebar({ seller }: { seller: Seller }) {
           <Link
             key={it.href}
             href={it.href}
-            className={`flex flex-1 flex-col items-center py-2 text-xs ${
+            className={`relative flex flex-1 flex-col items-center py-2 text-xs ${
               pathname === it.href ? "text-[#25D366]" : "text-white/60"
             }`}
           >
+            {it.href === "/dashboard" && pendingOrderCount > 0 && (
+              <span className="absolute right-2 top-1 min-w-[1rem] rounded-full bg-[#FF6B35] px-1 text-[9px] font-bold leading-tight text-black">
+                {pendingOrderCount > 9 ? "9+" : pendingOrderCount}
+              </span>
+            )}
             <span className="text-lg">{it.icon}</span>
             {it.label.split(" ")[0]}
           </Link>

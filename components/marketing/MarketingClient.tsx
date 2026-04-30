@@ -81,6 +81,13 @@ function Hero() {
         </a>
         <button
           type="button"
+          onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+          className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white"
+        >
+          See pricing
+        </button>
+        <button
+          type="button"
           onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
           className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white"
         >
@@ -199,14 +206,15 @@ function Features() {
     "🇮🇳 Gujarati + Hindi + English — bot understands all three, no setup needed.",
     "💳 Instant UPI/Razorpay Payment Links — clear money before you pack.",
     "📦 Live Order Dashboard — statuses and payments in one dark screen.",
-    "🤖 AI Order Parser — “5 kilo bataka” becomes a line item automatically.",
+    "🤖 AI Order Parser — \"5 kilo bataka\" becomes a line item automatically.",
     "📍 Smart Address Collection — area + full address, saved for next time.",
     "🔔 Real-time Alerts — new orders pop in with a soft ping.",
   ];
   return (
     <section className="border-t border-white/5 py-16">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="grid gap-4 md:grid-cols-2">
+        <h2 className="font-display text-4xl text-white md:text-5xl">Why shop owners pick Porter</h2>
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
           {items.map((t) => (
             <div key={t} className="rounded-2xl border border-white/10 bg-[#111A14] p-5 text-sm text-white/80">
               {t}

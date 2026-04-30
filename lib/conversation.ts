@@ -150,6 +150,24 @@ async function runCollectingItems(
 
   const total = round2(parsed.reduce((s, i) => s + i.total_price, 0));
   const lines = parsed.map((i) => `• ${i.product_name} — ${i.quantity} ${i.unit} × ₹${i.unit_price} = ₹${i.total_price}`);
+
+  if (!seller.cod_enabled) {
+    const zones = seller.delivery_zones ?? [];
+    const zoneHint =
+      zones.length > 0 ? `\n\nDelivery areas: ${zones.join(", ")}` : "";
+    await supabase
+      .from("conversations")
+      .update({
+        state: "collecting_area",
+        context: { items: parsed, order_total: total, payment_method: "razorpay" as PaymentMethod },
+        last_message_at: now,
+      })
+      .eq("id", conversation.id);
+    const msg = `Got it! Here's your order:\n${lines.join("\n")}\n💰 Total: ₹${total}\n\nOnline payment only on this store.${zoneHint}\n\nTamaro area moklo.`;
+    await sendMessage(phone, msg, seller);
+    return;
+  }
+
   const msg = `Got it! Here's your order:\n${lines.join("\n")}\n💰 Total: ₹${total}\n\nHow do you want to pay?\n1️⃣ Online (UPI/Card) — pay now\n2️⃣ Cash on Delivery — pay when it arrives\n\nReply 1 or 2`;
 
   await supabase
@@ -235,7 +253,9 @@ async function runCollectingArea(
   if (!match) {
     await sendMessage(
       phone,
-      `Area match nathi thayu. Valid zones: ${zones.join(", ") || "store ne contact karo"}`,
+      zones.length > 0
+        ? `Area match nathi thayu. Valid zones: ${zones.join(", ")}`
+        : "Area samajyu nathi — ferthi moklo.",
       seller
     );
     return;
@@ -273,6 +293,15 @@ async function runCollectingAddress(
   const address = text.trim();
   const total = ctx.order_total ?? round2(items.reduce((s, i) => s + i.total_price, 0));
 
+  if (paymentMethod === "razorpay" && (!seller.razorpay_key_id || !seller.razorpay_key_secret)) {
+    await sendMessage(
+      phone,
+      "Online payment setup pending on store side. Store ne call karo.",
+      seller
+    );
+    return;
+  }
+
   const { data: cust } = await supabase
     .from("customers")
     .upsert(
@@ -292,7 +321,7 @@ async function runCollectingAddress(
   const paymentStatus: PaymentStatus =
     paymentMethod === "cod" ? "cod_pending" : "unpaid";
   const orderStatus: OrderStatus =
-    paymentMethod === "cod" ? "confirmed" : "confirmed";
+    paymentMethod === "cod" ? "confirmed" : "pending";
 
   const { data: order, error: orderErr } = await supabase
     .from("orders")
@@ -340,24 +369,23 @@ async function runCollectingAddress(
   const summary = summaryLines.join("\n");
 
   if (paymentMethod === "razorpay") {
-    if (!seller.razorpay_key_id || !seller.razorpay_key_secret) {
-      await sendMessage(
-        phone,
-        "Online payment setup pending on store side. Store ne call karo.",
-        seller
-      );
-      return;
-    }
     const link = await createPaymentLink({
       amountPaise: Math.round(total * 100),
       order: order,
-      keyId: seller.razorpay_key_id,
-      keySecret: seller.razorpay_key_secret,
+      keyId: seller.razorpay_key_id!,
+      keySecret: seller.razorpay_key_secret!,
       callbackUrl: process.env.NEXT_PUBLIC_APP_URL
         ? `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
         : undefined,
     });
     if (!link) {
+      await supabase.from("order_items").delete().eq("order_id", order.id);
+      await supabase.from("orders").delete().eq("id", order.id);
+      if (customerId) {
+        const { data: c } = await supabase.from("customers").select("order_count").eq("id", customerId).single();
+        const oc = Math.max(0, ((c?.order_count as number) ?? 1) - 1);
+        await supabase.from("customers").update({ order_count: oc }).eq("id", customerId);
+      }
       await sendMessage(phone, "Payment link banavi shakyu nathi. Ferthi try karo.", seller);
       return;
     }
@@ -429,9 +457,11 @@ function round2(n: number) {
 
 /** Fuzzy-picks a delivery zone from the seller's zone list. */
 function matchZone(input: string, zones: string[]): string | null {
-  if (zones.length === 0) return input.trim();
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (zones.length === 0) return trimmed;
   const fuse = new Fuse(zones, { includeScore: true, threshold: 0.5 });
-  const r = fuse.search(input.trim());
+  const r = fuse.search(trimmed);
   if (!r[0] || r[0].score == null) return null;
   const conf = 1 - r[0].score;
   return conf >= 0.45 ? r[0].item : null;

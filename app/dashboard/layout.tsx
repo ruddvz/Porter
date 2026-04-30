@@ -16,9 +16,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: seller } = await supabase.from("sellers").select("*").eq("user_id", user.id).maybeSingle();
   if (!seller) redirect("/onboarding");
 
+  const { count: pendingCount } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("seller_id", seller.id)
+    .eq("status", "pending");
+
   return (
     <div className={`${dmSans.variable} ${bebas.variable} flex min-h-screen bg-[#0A0F0D] font-sans`}>
-      <Sidebar seller={seller} />
+      <Sidebar seller={seller} pendingOrderCount={pendingCount ?? 0} />
       <div className="min-h-screen flex-1 pb-24 md:pb-8 md:pl-[220px]">{children}</div>
     </div>
   );

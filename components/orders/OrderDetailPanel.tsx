@@ -26,7 +26,11 @@ export default function OrderDetailPanel({
     setBusy(true);
     const { error } = await supabase
       .from("orders")
-      .update({ payment_status: "paid", paid_at: new Date().toISOString() })
+      .update({
+        payment_status: "paid",
+        paid_at: new Date().toISOString(),
+        status: "confirmed",
+      })
       .eq("id", o.id);
     setBusy(false);
     if (error) alert(error.message);
