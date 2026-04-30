@@ -1,4 +1,5 @@
 import ImpersonateButton from "@/components/admin/ImpersonateButton";
+import SellerDetailActions from "@/components/admin/SellerDetailActions";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
@@ -51,6 +52,7 @@ export default async function AdminSellerDetailPage({ params }: { params: { id: 
             <p>Razorpay: {seller.razorpay_key_id && seller.razorpay_key_secret ? "keys present" : "not configured"}</p>
           </div>
           <ImpersonateButton sellerId={seller.id} />
+          <SellerDetailActions sellerId={seller.id} currentPlan={seller.plan} isActive={seller.is_active} />
         </Card>
         <Card padding="md">
           <h2 className="text-title">Inventory summary</h2>

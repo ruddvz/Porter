@@ -41,11 +41,21 @@ export default function LiveOrdersBoard({
   const { push: toast } = useToast();
   const nowMs = useSharedNow();
   const supabase = createSupabaseBrowserClient();
-  const { orders, setOrders } = useRealtimeOrders(seller.id, initialOrders as Order[]);
+  const [soundOn, setSoundOn] = useState(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const { orders, setOrders } = useRealtimeOrders(seller.id, initialOrders as Order[], { playSoundOnNewOrder: soundOn });
   const typed = orders as OrderWithItems[];
   const [panel, setPanel] = useState<OrderWithItems | null>(null);
   const seenIds = useRef<Set<string>>(new Set(initialOrders.map((o) => o.id)));
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const enable = () => setSoundOn(true);
+    el.addEventListener("pointerdown", enable, { once: true });
+    return () => el.removeEventListener("pointerdown", enable);
+  }, []);
 
   useEffect(() => {
     initialOrders.forEach((o) => seenIds.current.add(o.id));
@@ -137,7 +147,7 @@ export default function LiveOrdersBoard({
           <StatCard label="Paid orders" value={stats.paidCount} valueTone="success" />
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-3" ref={boardRef}>
           <KanbanColumn title="Pending" count={board.pending.length}>
             {board.pending.length === 0 ? (
               <EmptyState title="No pending orders" description="New WhatsApp orders appear here in real time." />

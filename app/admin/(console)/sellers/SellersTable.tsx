@@ -123,6 +123,15 @@ export default function SellersTable({
                   <Link className="block px-3 py-2 text-sm hover:bg-porter-bg-surface" href={`/admin/sellers/${s.id}`}>
                     View detail
                   </Link>
+                  <Link className="block px-3 py-2 text-sm hover:bg-porter-bg-surface" href={`/admin/sellers/${s.id}#admin-seller-actions`}>
+                    Edit plan
+                  </Link>
+                  <Link
+                    className="block px-3 py-2 text-sm text-porter-status-cancelled hover:bg-porter-bg-surface"
+                    href={`/admin/sellers/${s.id}#admin-seller-actions`}
+                  >
+                    Deactivate
+                  </Link>
                   <button
                     type="button"
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-porter-bg-surface"

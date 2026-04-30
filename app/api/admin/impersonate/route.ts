@@ -37,6 +37,14 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 4,
   });
 
+  const { logPlatformEvent } = await import("@/lib/log-platform-event");
+  await logPlatformEvent({
+    adminUserId: user.id,
+    eventType: "impersonate_start",
+    targetSellerId: sellerId,
+    notes: null,
+  });
+
   return NextResponse.json({ ok: true });
 }
 
@@ -53,6 +61,14 @@ export async function DELETE() {
 
   const cookieStore = await cookies();
   cookieStore.delete("porter_admin_impersonate");
+
+  const { logPlatformEvent } = await import("@/lib/log-platform-event");
+  await logPlatformEvent({
+    adminUserId: user.id,
+    eventType: "impersonate_end",
+    targetSellerId: null,
+    notes: null,
+  });
 
   return NextResponse.json({ ok: true });
 }
