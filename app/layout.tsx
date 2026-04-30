@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans, Bebas_Neue, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import { AdminAuthProvider } from "@/lib/admin-auth-context";
 import { PwaRegister } from "@/components/pwa/PwaRegister";
 import { withBasePath } from "@/lib/base-path";
 
@@ -59,8 +60,10 @@ export default function RootLayout({
         className={`${dmSans.variable} ${bebasNeue.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         <ToastProvider>
-          <PwaRegister />
-          {children}
+          <AdminAuthProvider>
+            <PwaRegister />
+            {children}
+          </AdminAuthProvider>
         </ToastProvider>
       </body>
     </html>

@@ -9,9 +9,12 @@ export default function Home() {
           WhatsApp-first order management for local shops — dashboard and design system preview.
         </p>
       </div>
-      <div className="flex flex-col gap-space-3 sm:flex-row">
+      <div className="flex flex-col gap-space-3 sm:flex-row sm:flex-wrap sm:justify-center">
         <Button href="/dashboard/" variant="primary" size="lg">
           Open shop dashboard
+        </Button>
+        <Button href="/admin/login/" variant="secondary" size="lg">
+          Admin login (demo)
         </Button>
         <Button href="/design-system/" variant="secondary" size="lg">
           Design system
