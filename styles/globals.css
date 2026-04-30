@@ -1,0 +1,139 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(37, 211, 102, 0.08);
+  --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(37, 211, 102, 0.12);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(37, 211, 102, 0.15);
+  --shadow-glow: 0 0 24px rgba(37, 211, 102, 0.2);
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-porter-bg-base text-porter-text-primary font-sans min-h-screen;
+    font-family: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .text-display {
+    font-family: var(--font-bebas), "Bebas Neue", sans-serif;
+    @apply text-[48px] leading-none tracking-wide font-normal;
+  }
+
+  .text-heading {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    @apply text-2xl font-bold leading-tight;
+  }
+
+  .text-title {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    @apply text-lg font-semibold leading-snug;
+  }
+
+  .text-body {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    @apply text-sm font-normal leading-relaxed;
+  }
+
+  .text-label {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    @apply text-xs font-semibold tracking-wider uppercase leading-none;
+  }
+
+  .text-mono {
+    font-family: var(--font-jetbrains), "JetBrains Mono", monospace;
+    @apply text-[13px] font-normal leading-normal;
+  }
+
+  .font-display {
+    font-family: var(--font-bebas), "Bebas Neue", sans-serif;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      theme("colors.porter.bg.raised") 0%,
+      theme("colors.porter.bg.border") 50%,
+      theme("colors.porter.bg.raised") 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.2s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s var(--spring) forwards;
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-order-glow {
+    animation: order-glow 0.6s ease-out;
+  }
+
+  @keyframes order-glow {
+    0% {
+      box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.35);
+    }
+    100% {
+      box-shadow: 0 0 0 8px rgba(37, 211, 102, 0);
+    }
+  }
+
+  @keyframes modal-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes modal-fade {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
