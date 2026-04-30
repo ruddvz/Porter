@@ -108,14 +108,20 @@ Just send your building name + flat/house number and your order is confirmed.`;
 
     const ok = await sendMessage(phone, message, s);
     if (ok) {
-      await supabase
+      const lm = row.last_message_at;
+      let q = supabase
         .from("conversations")
         .update({
           nudge_count: nudgeCount + 1,
           last_nudge_at: new Date().toISOString(),
         })
-        .eq("id", row.id)
-        .eq("last_message_at", row.last_message_at ?? "");
+        .eq("id", row.id);
+      q = lm == null ? q.is("last_message_at", null) : q.eq("last_message_at", lm);
+      const { error: upErr } = await q;
+      if (upErr) {
+        errors.push(`update failed ${row.id}: ${upErr.message}`);
+        continue;
+      }
       nudged++;
     } else {
       errors.push(`send failed ${row.id}`);

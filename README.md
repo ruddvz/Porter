@@ -4,7 +4,8 @@
 
 1. Link project: `supabase link` (or use Dashboard SQL editor).
 2. Run migration: paste `supabase/migrations/001_initial_schema.sql` into **SQL Editor** → Run, or use `supabase db push` if CLI is configured.
-3. Apply follow-up migrations in order: `002_conversation_nudge.sql`, `003_admin.sql`, `004_seller_bot_settings.sql` (conversation nudges, admin RPC/tables, seller bot fields).
+3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql` (admin, seller bot fields, then conversation nudge columns for Session 5 cron).  
+   **Note:** Session 5 was originally named `002_conversation_nudge.sql`; that collided with other `002` migrations. Use **`005_conversation_nudge.sql`** only. If you already ran the old file, skip `005` — the `ALTER` is idempotent.
 4. Optional seed: run `supabase/seed.sql` after you have at least one `auth.users` row (sign up via `/auth/signup`).
 
 ### Admin users
