@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, Bebas_Neue, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import { PwaRegister } from "@/components/pwa/PwaRegister";
+import { withBasePath } from "@/lib/base-path";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -27,6 +29,23 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Porter",
   description: "WhatsApp-first order management for local shops",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Porter",
+  },
+  icons: {
+    icon: [{ url: `${withBasePath("/favicon.ico")}`, sizes: "any" }],
+    apple: `${withBasePath("/apple-touch-icon.png")}`,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0A0F0D",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -39,7 +58,10 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${bebasNeue.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <PwaRegister />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

@@ -21,6 +21,11 @@ export type SidebarProps = {
   userAvatarUrl?: string | null;
   onLogout: () => void;
   className?: string;
+  /** When set with onMobileOpenChange, mobile drawer is controlled (e.g. TopBar menu button). */
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
+  /** Hide the default floating menu button (use when TopBar opens the drawer). */
+  hideMobileMenuButton?: boolean;
 };
 
 function NavLinks({
@@ -132,11 +137,18 @@ export function Sidebar({
   userAvatarUrl,
   onLogout,
   className,
+  mobileOpen: mobileOpenControlled,
+  onMobileOpenChange,
+  hideMobileMenuButton = false,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const mobileOpen =
+    mobileOpenControlled !== undefined ? mobileOpenControlled : internalOpen;
+  const setMobileOpen = onMobileOpenChange ?? setInternalOpen;
 
-  const closeMobile = useCallback(() => setMobileOpen(false), []);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const closeMobile = useCallback(() => setMobileOpen(false), [setMobileOpen]);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -150,7 +162,7 @@ export function Sidebar({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [mobileOpen]);
+  }, [mobileOpen, setMobileOpen]);
 
   const shellClass = cn(
     "flex h-full shrink-0 flex-col border-r border-porter-bg-border bg-porter-bg-surface transition-[width] duration-[250ms] ease-out",
@@ -160,14 +172,16 @@ export function Sidebar({
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed left-space-3 top-space-3 z-40 flex min-h-11 min-w-11 items-center justify-center rounded-md border border-porter-bg-border bg-porter-bg-surface text-porter-text-primary shadow-card lg:hidden"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      {!hideMobileMenuButton && (
+        <button
+          type="button"
+          className="fixed left-space-3 top-space-3 z-40 flex min-h-11 min-w-11 items-center justify-center rounded-md border border-porter-bg-border bg-porter-bg-surface text-porter-text-primary shadow-card lg:hidden"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
 
       <aside className={cn("hidden h-full lg:flex", shellClass)}>
         <div className="flex h-14 items-center justify-between gap-space-2 border-b border-porter-bg-border px-space-3">

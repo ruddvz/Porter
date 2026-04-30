@@ -6,12 +6,17 @@ export default function Home() {
       <div className="text-center space-y-space-3">
         <p className="font-display text-5xl tracking-wide text-porter-green-500">PORTER</p>
         <p className="text-body text-porter-text-secondary max-w-md">
-          WhatsApp-first order management. Session 0 design system is ready.
+          WhatsApp-first order management for local shops — dashboard and design system preview.
         </p>
       </div>
-      <Button href="/design-system" variant="primary" size="lg">
-        View design system
-      </Button>
+      <div className="flex flex-col gap-space-3 sm:flex-row">
+        <Button href="/dashboard/" variant="primary" size="lg">
+          Open shop dashboard
+        </Button>
+        <Button href="/design-system/" variant="secondary" size="lg">
+          Design system
+        </Button>
+      </div>
     </div>
   );
 }

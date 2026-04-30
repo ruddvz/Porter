@@ -24,6 +24,7 @@ export type TableProps<T> = {
   emptyDescription?: string;
   emptyIcon?: ReactNode;
   className?: string;
+  onRowClick?: (row: T) => void;
 };
 
 export function Table<T>({
@@ -37,6 +38,7 @@ export function Table<T>({
   emptyDescription,
   emptyIcon,
   className,
+  onRowClick,
 }: TableProps<T>) {
   const handleSort = (col: TableColumn<T>) => {
     if (!col.sortable || !onSortChange) return;
@@ -119,7 +121,11 @@ export function Table<T>({
               {data.map((row) => (
                 <tr
                   key={getRowKey(row)}
-                  className="border-b border-porter-bg-border/80 transition-colors hover:bg-porter-bg-raised/60"
+                  className={cn(
+                    "border-b border-porter-bg-border/80 transition-colors hover:bg-porter-bg-raised/60",
+                    onRowClick && "cursor-pointer"
+                  )}
+                  onClick={() => onRowClick?.(row)}
                 >
                   {columns.map((col) => (
                     <td
