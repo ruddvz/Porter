@@ -2,6 +2,8 @@ import OrderHistoryClient from "./ui";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 
+const PAGE_SIZE = 20;
+
 export default async function OrderHistoryPage() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -16,7 +18,7 @@ export default async function OrderHistoryPage() {
     .select("*, order_items(*)")
     .eq("seller_id", seller.id)
     .order("created_at", { ascending: false })
-    .limit(500);
+    .range(0, PAGE_SIZE - 1);
 
-  return <OrderHistoryClient initialOrders={orders ?? []} />;
+  return <OrderHistoryClient sellerId={seller.id} initialOrders={orders ?? []} pageSize={PAGE_SIZE} />;
 }

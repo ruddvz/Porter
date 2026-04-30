@@ -150,3 +150,27 @@
 .animate-porter-modal-sheet {
   animation: porter-modal-sheet-in 0.4s var(--spring) both;
 }
+
+/* Marketing: WhatsApp chat demo sequence (CSS-driven steps) */
+@keyframes wa-chat-cycle {
+  0%,
+  4% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  6%,
+  14% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  16%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wa-bubble {
+  opacity: 0;
+  animation: wa-chat-cycle 16s ease-in-out infinite;
+}

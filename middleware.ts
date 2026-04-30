@@ -26,6 +26,29 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  if (path.startsWith("/admin")) {
+    if (path === "/admin/login") {
+      if (user) {
+        const { data: isAdmin } = await supabase.rpc("is_platform_admin");
+        if (isAdmin) {
+          return NextResponse.redirect(new URL("/admin", request.url));
+        }
+      }
+      return response;
+    }
+    if (!user) {
+      const login = new URL("/admin/login", request.url);
+      login.searchParams.set("next", path);
+      return NextResponse.redirect(login);
+    }
+    const { data: isAdmin, error } = await supabase.rpc("is_platform_admin");
+    if (error || !isAdmin) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+    return response;
+  }
+
   if ((path.startsWith("/dashboard") || path.startsWith("/onboarding")) && !user) {
     const login = new URL("/auth/login", request.url);
     login.searchParams.set("next", path);
@@ -39,5 +62,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/onboarding", "/auth/login", "/auth/signup"],
+  matcher: ["/dashboard/:path*", "/onboarding", "/auth/login", "/auth/signup", "/admin/:path*"],
 };

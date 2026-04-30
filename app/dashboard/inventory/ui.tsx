@@ -2,18 +2,31 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Product } from "@/types";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Toast";
+import { Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-const UNITS = ["kg", "pkt", "litre", "piece", "dozen"] as const;
+const PRESET_CATEGORIES = ["Vegetables", "Dairy", "Staples", "Beverages", "Snacks", "Household", "Other"];
+const UNITS = ["kg", "litre", "pkt", "piece", "dozen", "box"] as const;
 
-/** Product grid with modal add/edit, bulk stock toggle, and delete. */
+const PRESET_SET = new Set(PRESET_CATEGORIES.map((c) => c.toLowerCase()));
+
 export default function InventoryClient({ initialProducts }: { initialProducts: Product[] }) {
   const supabase = createSupabaseBrowserClient();
+  const { push: toast } = useToast();
   const [products, setProducts] = useState(initialProducts);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | "all">("all");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<Product | "new" | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const categories = useMemo(() => {
     const s = new Set<string>();
@@ -33,155 +46,180 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
     });
   }, [products, search, category]);
 
+  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  const selectedCount = selectedIds.length;
+
   function toggleSelect(id: string) {
     setSelected((s) => ({ ...s, [id]: !s[id] }));
   }
 
-  function selectAll() {
-    const m: Record<string, boolean> = {};
-    filtered.forEach((p) => {
-      m[p.id] = true;
-    });
-    setSelected(m);
-  }
-
-  function clearSelect() {
-    setSelected({});
-  }
-
   async function bulkOutOfStock() {
-    const ids = Object.keys(selected).filter((k) => selected[k]);
-    if (!ids.length) return;
-    if (!confirm(`Mark ${ids.length} products out of stock?`)) return;
-    const { error } = await supabase.from("products").update({ in_stock: false }).in("id", ids);
-    if (error) alert(error.message);
-    else setProducts((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, in_stock: false } : p)));
+    if (!selectedIds.length) return;
+    const prev = products;
+    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, in_stock: false } : x)));
+    const { error } = await supabase.from("products").update({ in_stock: false }).in("id", selectedIds);
+    if (error) {
+      setProducts(prev);
+      toast(error.message, "error");
+    } else {
+      toast("Marked out of stock", "success");
+      setSelected({});
+    }
   }
 
   async function bulkDelete() {
-    const ids = Object.keys(selected).filter((k) => selected[k]);
-    if (!ids.length) return;
-    if (!confirm(`Delete ${ids.length} products?`)) return;
-    const { error } = await supabase.from("products").delete().in("id", ids);
-    if (error) alert(error.message);
-    else {
-      setProducts((prev) => prev.filter((p) => !ids.includes(p.id)));
-      clearSelect();
+    if (!selectedIds.length) return;
+    const prev = products;
+    setProducts((p) => p.filter((x) => !selectedIds.includes(x.id)));
+    const { error } = await supabase.from("products").delete().in("id", selectedIds);
+    if (error) {
+      setProducts(prev);
+      toast(error.message, "error");
+    } else {
+      toast("Products deleted", "success");
+      setSelected({});
+      setBulkDeleteOpen(false);
     }
   }
 
   return (
-    <div className="px-4 py-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <h1 className="font-display text-3xl text-white">Inventory</h1>
-        <button type="button" onClick={() => setModal("new")} className="rounded-lg bg-[#25D366] px-4 py-2 text-sm font-semibold text-black">
-          Add product
-        </button>
-      </div>
-
-      <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
-        <input
+    <div className="space-y-4 px-3 py-4 md:px-6 md:py-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <Input.Text
+          id="inv-search"
+          label="Search"
+          inputVariant="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search products or aliases"
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white md:max-w-md"
+          placeholder="Products or aliases"
+          className="md:max-w-md"
         />
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setCategory("all")}
-            className={`rounded-full px-3 py-1 text-xs ${category === "all" ? "bg-[#25D366] text-black" : "bg-white/10 text-white/70"}`}
-          >
-            All
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setCategory(c)}
-              className={`rounded-full px-3 py-1 text-xs capitalize ${
-                category === c ? "bg-[#25D366] text-black" : "bg-white/10 text-white/70"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant={editMode ? "primary" : "secondary"} onClick={() => setEditMode((v) => !v)}>
+            Edit mode
+          </Button>
+          <Button type="button" onClick={() => setModal("new")}>
+            Add product
+          </Button>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <button type="button" onClick={selectAll} className="rounded border border-white/20 px-2 py-1 text-white/70">
-          Select all (filtered)
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <button
+          type="button"
+          onClick={() => setCategory("all")}
+          className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
+            category === "all"
+              ? "border-porter-green-500 bg-porter-green-500/15 text-porter-green-400"
+              : "border-porter-bg-border bg-porter-bg-surface text-porter-text-secondary"
+          }`}
+        >
+          All
         </button>
-        <button type="button" onClick={clearSelect} className="rounded border border-white/20 px-2 py-1 text-white/70">
-          Deselect all
-        </button>
-        <button type="button" onClick={bulkOutOfStock} className="rounded border border-[#FF6B35] px-2 py-1 text-[#FF6B35]">
-          Mark selected OOS
-        </button>
-        <button type="button" onClick={bulkDelete} className="rounded border border-red-500/50 px-2 py-1 text-red-300">
-          Delete selected
-        </button>
+        {categories.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCategory(c)}
+            className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold capitalize ${
+              category === c ? "border-porter-green-500 bg-porter-green-500/15 text-porter-green-400" : "border-porter-bg-border bg-porter-bg-surface text-porter-text-secondary"
+            }`}
+          >
+            {c}
+          </button>
+        ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {filtered.map((p) => (
-          <div key={p.id} className="rounded-xl border border-white/10 bg-[#111A14] p-3">
-            <div className="flex items-start justify-between gap-2">
-              <input type="checkbox" checked={!!selected[p.id]} onChange={() => toggleSelect(p.id)} />
-              <div className="flex gap-2">
-                <button type="button" className="text-white/50 hover:text-white" onClick={() => setModal(p)} aria-label="Edit">
-                  ✎
-                </button>
-                <button
-                  type="button"
-                  className="text-white/50 hover:text-red-300"
-                  onClick={async () => {
-                    if (!confirm("Delete product?")) return;
-                    const { error } = await supabase.from("products").delete().eq("id", p.id);
-                    if (error) alert(error.message);
-                    else setProducts((prev) => prev.filter((x) => x.id !== p.id));
-                  }}
-                  aria-label="Delete"
-                >
-                  🗑
-                </button>
-              </div>
+          <Card key={p.id} variant="glow" padding="md" className="relative">
+            {editMode && (
+              <label className="absolute left-3 top-3 flex min-h-11 min-w-11 items-center">
+                <input type="checkbox" checked={!!selected[p.id]} onChange={() => toggleSelect(p.id)} className="h-5 w-5 accent-porter-green-500" />
+              </label>
+            )}
+            <div className="absolute right-2 top-2 flex gap-1">
+              <button
+                type="button"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-porter-text-muted hover:bg-porter-bg-raised hover:text-porter-text-primary"
+                aria-label="Edit"
+                onClick={() => setModal(p)}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-porter-text-muted hover:bg-porter-bg-raised hover:text-porter-status-cancelled"
+                aria-label="Delete"
+                onClick={async () => {
+                  if (!confirm("Delete this product?")) return;
+                  const prev = products;
+                  setProducts((x) => x.filter((y) => y.id !== p.id));
+                  const { error } = await supabase.from("products").delete().eq("id", p.id);
+                  if (error) {
+                    setProducts(prev);
+                    toast(error.message, "error");
+                  } else toast("Product deleted", "success");
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-            <p className="mt-2 font-semibold text-white">{p.name}</p>
+            <p className={`pr-16 text-title text-porter-text-primary ${editMode ? "pl-8" : ""}`}>{p.name}</p>
             <div className="mt-2 flex flex-wrap gap-1">
-              {(p.aliases ?? []).slice(0, 6).map((a) => (
-                <span key={a} className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60">
+              {(p.aliases ?? []).slice(0, 8).map((a) => (
+                <span key={a} className="rounded-md border border-porter-bg-border bg-porter-bg-raised px-1.5 py-0.5 text-[10px] text-porter-text-muted">
                   {a}
                 </span>
               ))}
             </div>
-            <p className="mt-2 text-sm text-[#25D366]">
-              ₹{p.price} / {p.unit}
+            <p className="mt-3 font-display text-2xl tracking-wide text-porter-text-primary">
+              ₹{p.price} <span className="text-sm font-sans text-porter-text-muted">/ {p.unit}</span>
             </p>
-            {p.category && <span className="mt-1 inline-block rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase">{p.category}</span>}
-            <label className="mt-3 flex items-center justify-between text-xs text-white/70">
-              In stock
+            {p.category && (
+              <div className="mt-2">
+                <Badge kind="plan" variant="starter" label={p.category} size="sm" />
+              </div>
+            )}
+            <label className="mt-4 flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
+              <span className="text-sm font-semibold text-porter-text-secondary">In stock</span>
               <input
                 type="checkbox"
                 checked={p.in_stock}
                 onChange={async (e) => {
                   const in_stock = e.target.checked;
-                  setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, in_stock } : x)));
+                  const prev = p.in_stock;
+                  setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_stock } : x)));
                   const { error } = await supabase.from("products").update({ in_stock }).eq("id", p.id);
                   if (error) {
-                    alert(error.message);
-                    setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, in_stock: p.in_stock } : x)));
+                    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_stock: prev } : x)));
+                    toast(error.message, "error");
                   }
                 }}
-                className="h-5 w-5 accent-[#25D366]"
+                className="h-6 w-11 accent-porter-green-500"
               />
             </label>
-          </div>
+          </Card>
         ))}
       </div>
 
-      {filtered.length === 0 && <p className="mt-8 text-center text-sm text-white/50">No products match.</p>}
+      {filtered.length === 0 && (
+        <EmptyState title="No products match" description="Try a different search or category." />
+      )}
+
+      {editMode && selectedCount > 0 && (
+        <div className="fixed bottom-4 left-3 right-3 z-40 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-porter-bg-border bg-porter-bg-raised p-3 shadow-modal md:left-auto md:right-6 md:min-w-[420px]">
+          <span className="text-sm font-semibold text-porter-text-primary">{selectedCount} selected</span>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={() => void bulkOutOfStock()}>
+              Mark out of stock
+            </Button>
+            <Button type="button" size="sm" variant="danger" onClick={() => setBulkDeleteOpen(true)}>
+              Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
 
       {modal && (
         <ProductModal
@@ -191,9 +229,28 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
             if (modal === "new") setProducts((prev) => [p, ...prev]);
             else setProducts((prev) => prev.map((x) => (x.id === p.id ? p : x)));
             setModal(null);
+            toast("Product saved", "success");
           }}
         />
       )}
+
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        title="Delete selected products?"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setBulkDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void bulkDelete()}>
+              Delete {selectedCount}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-body text-porter-text-secondary">This will permanently remove the selected products from your catalog.</p>
+      </Modal>
     </div>
   );
 }
@@ -208,112 +265,179 @@ function ProductModal({
   onSaved: (p: Product) => void;
 }) {
   const supabase = createSupabaseBrowserClient();
+  const { push: toast } = useToast();
   const [name, setName] = useState(product?.name ?? "");
-  const [aliases, setAliases] = useState((product?.aliases ?? []).join(", "));
-  const [category, setCategory] = useState(product?.category ?? "");
+  const [aliasInput, setAliasInput] = useState("");
+  const [aliasChips, setAliasChips] = useState<string[]>(product?.aliases ?? []);
+  const [categoryMode, setCategoryMode] = useState<"preset" | "custom">(() => {
+    const c = product?.category ?? "";
+    if (!c) return "preset";
+    return PRESET_SET.has(c.toLowerCase()) ? "preset" : "custom";
+  });
+  const [categoryPreset, setCategoryPreset] = useState(() => {
+    const c = product?.category ?? "Other";
+    return PRESET_SET.has(c.toLowerCase()) ? c : "Other";
+  });
+  const [categoryCustom, setCategoryCustom] = useState(() => {
+    const c = product?.category ?? "";
+    return PRESET_SET.has(c.toLowerCase()) ? "" : c;
+  });
   const [price, setPrice] = useState(String(product?.price ?? ""));
   const [unit, setUnit] = useState(product?.unit ?? "kg");
   const [inStock, setInStock] = useState(product?.in_stock ?? true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  function addAliasesFromInput() {
+    const parts = aliasInput
+      .split(/[,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!parts.length) return;
+    setAliasChips((prev) => Array.from(new Set([...prev, ...parts])));
+    setAliasInput("");
+  }
+
+  function onAliasKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addAliasesFromInput();
+    }
+  }
 
   async function save() {
     setBusy(true);
-    setError(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      setError("Not signed in");
+      toast("Not signed in", "error");
       setBusy(false);
       return;
     }
     const { data: seller } = await supabase.from("sellers").select("id").eq("user_id", user.id).single();
     if (!seller) {
-      setError("No seller profile");
+      toast("No seller profile", "error");
       setBusy(false);
       return;
     }
-    const aliasArr = aliases
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
     const priceNum = parseFloat(price);
-    if (!name.trim() || !Number.isFinite(priceNum)) {
-      setError("Name and valid price required");
+    if (!name.trim() || !Number.isFinite(priceNum) || priceNum <= 0) {
+      toast("Name and price greater than 0 are required", "error");
       setBusy(false);
       return;
     }
+    const category =
+      categoryMode === "custom"
+        ? categoryCustom.trim() || null
+        : categoryPreset === "Other"
+          ? categoryCustom.trim() || "Other"
+          : categoryPreset;
+
     const row = {
       seller_id: seller.id,
       name: name.trim(),
-      aliases: aliasArr,
-      category: category.trim() || null,
+      aliases: aliasChips,
+      category,
       price: priceNum,
       unit,
       in_stock: inStock,
     };
     if (product) {
-      const { data, error: err } = await supabase.from("products").update(row).eq("id", product.id).select("*").single();
+      const { data, error } = await supabase.from("products").update(row).eq("id", product.id).select("*").single();
       setBusy(false);
-      if (err) setError(err.message);
+      if (error) toast(error.message, "error");
       else if (data) onSaved(data as Product);
     } else {
-      const { data, error: err } = await supabase.from("products").insert(row).select("*").single();
+      const { data, error } = await supabase.from("products").insert(row).select("*").single();
       setBusy(false);
-      if (err) setError(err.message);
+      if (error) toast(error.message, "error");
       else if (data) onSaved(data as Product);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 md:items-center" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-t-2xl border border-white/10 bg-[#111A14] p-5 md:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-display text-2xl text-white">{product ? "Edit product" : "Add product"}</h2>
-        <div className="mt-4 space-y-3 text-sm">
-          <label className="block">
-            <span className="text-white/70">Name *</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-white" />
-          </label>
-          <label className="block">
-            <span className="text-white/70">Aliases (comma-separated)</span>
-            <input value={aliases} onChange={(e) => setAliases(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-white" />
-          </label>
-          <label className="block">
-            <span className="text-white/70">Category</span>
-            <input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-white" />
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="text-white/70">Price *</span>
-              <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" step="0.01" className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-white" />
-            </label>
-            <label className="block">
-              <span className="text-white/70">Unit</span>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-white">
-                {UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
+    <Modal
+      open
+      onClose={onClose}
+      title={product ? "Edit product" : "Add product"}
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" loading={busy} onClick={() => void save()}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Input.Text id="p-name" label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
+        <div>
+          <Input.Text
+            id="p-alias"
+            label="Aliases"
+            value={aliasInput}
+            onChange={(e) => setAliasInput(e.target.value)}
+            onKeyDown={onAliasKeyDown}
+            onBlur={() => addAliasesFromInput()}
+            placeholder="e.g. bataka, aloo, potato — comma or Enter to add"
+          />
+          {aliasChips.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {aliasChips.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  className="rounded-full border border-porter-bg-border bg-porter-bg-surface px-2 py-1 text-xs text-porter-text-secondary hover:border-porter-orange-500/50"
+                  onClick={() => setAliasChips((c) => c.filter((x) => x !== a))}
+                >
+                  {a} ×
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="mb-1.5 text-label text-porter-text-secondary">Category</p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={categoryMode === "preset" ? "primary" : "secondary"} onClick={() => setCategoryMode("preset")}>
+                Preset
+              </Button>
+              <Button type="button" size="sm" variant={categoryMode === "custom" ? "primary" : "secondary"} onClick={() => setCategoryMode("custom")}>
+                Custom
+              </Button>
+            </div>
+            {categoryMode === "preset" ? (
+              <Input.Select id="p-cat-pre" label="Preset" value={categoryPreset} onChange={(e) => setCategoryPreset(e.target.value)}>
+                {PRESET_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
                   </option>
                 ))}
-              </select>
-            </label>
+              </Input.Select>
+            ) : (
+              <Input.Text id="p-cat-cust" label="Category name" value={categoryCustom} onChange={(e) => setCategoryCustom(e.target.value)} />
+            )}
+            {categoryMode === "preset" && categoryPreset === "Other" && (
+              <Input.Text id="p-cat-other" label="Other (specify)" className="mt-2" value={categoryCustom} onChange={(e) => setCategoryCustom(e.target.value)} />
+            )}
           </div>
-          <label className="flex items-center gap-2 text-white/80">
-            <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="accent-[#25D366]" />
-            In stock
-          </label>
+          <Input.Text id="p-price" label="Price (₹)" inputVariant="number" required value={price} onChange={(e) => setPrice(e.target.value)} min={0.01} step={0.01} />
         </div>
-        {error && <p className="mt-2 text-sm text-[#FF6B35]">{error}</p>}
-        <div className="mt-4 flex gap-2">
-          <button type="button" onClick={save} disabled={busy} className="flex-1 rounded-lg bg-[#25D366] py-2 font-semibold text-black">
-            Save
-          </button>
-          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-white/20 py-2 text-white">
-            Cancel
-          </button>
-        </div>
+        <Input.Select id="p-unit" label="Unit" value={unit} onChange={(e) => setUnit(e.target.value)}>
+          {UNITS.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </Input.Select>
+        <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
+          <span className="text-sm font-semibold text-porter-text-secondary">In stock</span>
+          <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="h-6 w-11 accent-porter-green-500" />
+        </label>
       </div>
-    </div>
+    </Modal>
   );
 }

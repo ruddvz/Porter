@@ -1,0 +1,58 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+
+export const runtime = "nodejs";
+
+export async function POST(req: Request) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let body: { sellerId?: string };
+  try {
+    body = (await req.json()) as { sellerId?: string };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const sellerId = body.sellerId?.trim();
+  if (!sellerId) return NextResponse.json({ error: "sellerId required" }, { status: 400 });
+
+  const admin = createSupabaseAdminClient();
+  const { data: adminRow } = await admin.from("admin_users").select("id").eq("user_id", user.id).maybeSingle();
+  if (!adminRow) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { data: seller } = await admin.from("sellers").select("id").eq("id", sellerId).maybeSingle();
+  if (!seller) return NextResponse.json({ error: "Seller not found" }, { status: 404 });
+
+  const cookieStore = await cookies();
+  cookieStore.set("porter_admin_impersonate", sellerId, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 4,
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = createSupabaseAdminClient();
+  const { data: adminRow } = await admin.from("admin_users").select("id").eq("user_id", user.id).maybeSingle();
+  if (!adminRow) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const cookieStore = await cookies();
+  cookieStore.delete("porter_admin_impersonate");
+
+  return NextResponse.json({ ok: true });
+}
