@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,16 +6,68 @@
 
 :root {
   --background: #0a0f0d;
-  --foreground: #e8f0eb;
-  --wa-green: #25d366;
-  --accent-orange: #ff6b35;
-  --surface: #111a14;
+  --foreground: #e8f5e9;
+  --font-dm-sans: "DM Sans", sans-serif;
+  --font-bebas: "Bebas Neue", sans-serif;
+  --font-jetbrains: "JetBrains Mono", monospace;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(37, 211, 102, 0.08);
+  --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(37, 211, 102, 0.12);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(37, 211, 102, 0.15);
+  --shadow-glow: 0 0 24px rgba(37, 211, 102, 0.2);
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: "DM Sans", system-ui, sans-serif;
+@layer base {
+  body {
+    @apply min-h-screen bg-porter-bg-base font-sans text-porter-text-primary antialiased;
+    color: var(--foreground);
+    background: var(--background);
+  }
+}
+
+@layer utilities {
+  .text-display {
+    font-family: var(--font-bebas), "Bebas Neue", sans-serif;
+    font-size: 48px;
+    line-height: 1;
+    letter-spacing: 0.05em;
+    font-weight: 400;
+  }
+  .text-heading {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    font-size: 24px;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+  .text-title {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    font-size: 18px;
+    line-height: 1.35;
+    font-weight: 600;
+  }
+  .text-body {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    font-size: 14px;
+    line-height: 1.625;
+    font-weight: 400;
+  }
+  .text-label {
+    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .text-mono {
+    font-family: var(--font-jetbrains), "JetBrains Mono", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    font-weight: 400;
+  }
 }
 
 .grain::before {
@@ -54,4 +106,47 @@ body {
 
 .animate-hero-bubble {
   animation: hero-bubble 4s ease-in-out infinite;
+}
+
+@keyframes porter-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes porter-modal-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 640px) {
+  @keyframes porter-modal-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+
+.animate-porter-modal {
+  animation: porter-modal-in 0.35s var(--spring) both;
+}
+
+.animate-porter-modal-sheet {
+  animation: porter-modal-sheet-in 0.4s var(--spring) both;
 }

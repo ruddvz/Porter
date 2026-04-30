@@ -2,13 +2,13 @@
 
 import { useSyncExternalStore } from "react";
 
-let listeners = new Set<() => void>();
+const listeners = new Set<() => void>();
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 function ensureInterval() {
   if (intervalId != null) return;
   intervalId = setInterval(() => {
-    for (const l of listeners) l();
+    listeners.forEach((l) => l());
   }, 1000);
 }
 
