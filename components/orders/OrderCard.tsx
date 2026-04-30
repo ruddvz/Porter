@@ -1,13 +1,14 @@
 "use client";
 
 import type { Order, OrderItem } from "@/types";
+import { useSharedNow } from "@/lib/hooks/useSharedNow";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useMemo, useState } from "react";
 
 export type OrderWithItems = Order & { order_items?: OrderItem[] };
 
-function timeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+function timeAgo(iso: string, nowMs: number) {
+  const s = Math.floor((nowMs - new Date(iso).getTime()) / 1000);
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
   if (m < 60) return `${m} mins ago`;
@@ -42,6 +43,7 @@ export function OrderCard({
   onUpdate: (o: Order) => void;
   onOpen: (o: OrderWithItems) => void;
 }) {
+  const nowMs = useSharedNow();
   const supabase = createSupabaseBrowserClient();
   const [busy, setBusy] = useState(false);
   const badge = useMemo(() => paymentBadge(order), [order]);
@@ -76,7 +78,7 @@ export function OrderCard({
       </div>
       <p className="mt-2 line-clamp-2 text-xs text-white/60">{itemSummary(order.order_items)}</p>
       <p className="mt-2 font-display text-2xl text-white">₹{order.total_amount ?? "—"}</p>
-      <p className="mt-1 text-xs text-white/40">{timeAgo(order.created_at)}</p>
+      <p className="mt-1 text-xs text-white/40">{timeAgo(order.created_at, nowMs)}</p>
       <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
         {order.status === "pending" && (
           <>

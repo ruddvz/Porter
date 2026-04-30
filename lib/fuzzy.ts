@@ -10,8 +10,9 @@ const THRESHOLD = 0.6;
 
 /** Returns best Fuse match score (0–1, higher is better) for text against product names + aliases. */
 export function fuzzyMatchProducts(text: string, products: Product[]): FuzzyMatchResult | null {
+  const sorted = [...products].sort((a, b) => a.id.localeCompare(b.id));
   const flat: { product: Product; needle: string }[] = [];
-  for (const p of products) {
+  for (const p of sorted) {
     flat.push({ product: p, needle: p.name });
     for (const a of p.aliases ?? []) {
       if (a) flat.push({ product: p, needle: a });
