@@ -69,7 +69,7 @@ export function Sidebar({
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl tracking-wide text-porter-green-500">{brand}</p>
-            {subtitle && <p className="truncate text-xs text-porter-text-secondary">{subtitle}</p>}
+            {subtitle != null && <div className="truncate text-xs text-porter-text-secondary">{subtitle}</div>}
           </div>
         )}
         <button
