@@ -23,6 +23,8 @@ export type TableProps<T> = {
   sortKey?: string | null;
   sortDir?: SortDir;
   onSortChange?: (key: string, dir: "asc" | "desc") => void;
+  /** Opens detail when row is clicked (ignores clicks on buttons/links/inputs). */
+  onRowClick?: (row: T) => void;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyIllustration?: ReactNode;
@@ -36,6 +38,7 @@ export function Table<T>({
   sortKey,
   sortDir,
   onSortChange,
+  onRowClick,
   emptyTitle = "Nothing here yet",
   emptyDescription = "When data arrives, it will show up in this table.",
   emptyIllustration,
@@ -133,7 +136,16 @@ export function Table<T>({
             {rows.map((row) => (
               <tr
                 key={getRowKey(row)}
-                className="border-t border-porter-bg-border transition-colors duration-fast hover:bg-porter-bg-raised/60"
+                onClick={(e) => {
+                  if (!onRowClick) return;
+                  const t = e.target as HTMLElement;
+                  if (t.closest("button, a, input, select, textarea, summary, [role='button']")) return;
+                  onRowClick(row);
+                }}
+                className={cn(
+                  "border-t border-porter-bg-border transition-colors duration-fast hover:bg-porter-bg-raised/60",
+                  onRowClick && "cursor-pointer",
+                )}
               >
                 {columns.map((col) => (
                   <td key={col.key} className={cn("px-4 py-3 align-middle text-porter-text-primary", col.className)}>

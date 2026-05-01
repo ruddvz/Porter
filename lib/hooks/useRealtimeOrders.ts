@@ -6,7 +6,12 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
 
 /** Subscribes to Supabase Realtime changes on orders for the current seller. */
-export function useRealtimeOrders(sellerId: string, initial: Order[]) {
+export function useRealtimeOrders(
+  sellerId: string,
+  initial: Order[],
+  options?: { playSoundOnNewOrder?: boolean },
+) {
+  const playSound = options?.playSoundOnNewOrder ?? false;
   const [orders, setOrders] = useState<Order[]>(initial);
 
   const playPing = useCallback(() => {
@@ -43,7 +48,7 @@ export function useRealtimeOrders(sellerId: string, initial: Order[]) {
           if (payload.eventType === "INSERT") {
             const row = payload.new as Order;
             setOrders((prev) => [row, ...prev.filter((o) => o.id !== row.id)]);
-            playPing();
+            if (playSound) playPing();
           }
           if (payload.eventType === "UPDATE") {
             const row = payload.new as Order;
@@ -56,7 +61,7 @@ export function useRealtimeOrders(sellerId: string, initial: Order[]) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sellerId, playPing]);
+  }, [sellerId, playPing, playSound]);
 
   return { orders, setOrders };
 }

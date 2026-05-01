@@ -7,12 +7,12 @@ export async function sendMessage(
   to: string,
   message: string,
   seller: Pick<Seller, "meta_phone_number_id" | "meta_access_token">
-): Promise<void> {
+): Promise<boolean> {
   const phoneId = seller.meta_phone_number_id;
   const token = seller.meta_access_token;
   if (!phoneId || !token) {
     console.error("[meta-whatsapp] Missing meta_phone_number_id or meta_access_token for seller");
-    return;
+    return false;
   }
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneId}/messages`;
   try {
@@ -32,8 +32,11 @@ export async function sendMessage(
     if (!res.ok) {
       const errText = await res.text();
       console.error("[meta-whatsapp] Send failed", res.status, errText);
+      return false;
     }
+    return true;
   } catch (e) {
     console.error("[meta-whatsapp] Send error", e);
+    return false;
   }
 }

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { ParsedLineItem, Product } from "@/types";
+import type { FullOrderParse, MessageIntent, ParsedLineItem, Product } from "@/types";
 import { FUZZY_CONFIDENCE_THRESHOLD, fuzzyMatchProducts } from "@/lib/fuzzy";
 
 /** Parses a single line / phrase into line items using fuzzy match first, Gemini when confidence is low. */
@@ -134,5 +134,95 @@ ${chunk}`;
   } catch (e) {
     console.error("[gemini] parse error", e);
     return [];
+  }
+}
+
+function extractJsonObject(raw: string): string | null {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  return raw.slice(start, end + 1);
+}
+
+/** Parses a single WhatsApp message for items + area + address + payment (fast path). */
+export async function parseFullOrder(
+  text: string,
+  products: Product[],
+  deliveryZones: string[]
+): Promise<FullOrderParse | null> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    console.error("[gemini] GEMINI_API_KEY missing");
+    return null;
+  }
+  const zones = deliveryZones.length ? deliveryZones.join(", ") : "(none configured)";
+  const catalogNames = products
+    .filter((p) => p.in_stock)
+    .map((p) => `${p.name} (${(p.aliases ?? []).filter(Boolean).join(", ")})`)
+    .join("; ");
+
+  const genAI = new GoogleGenerativeAI(key);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  const prompt = `You parse WhatsApp messages for a grocery store in Gujarat, India.
+Messages may be Gujarati, Hindi, English, or mixed.
+Extract ALL of the following if present:
+- items: grocery items with quantities (e.g. '5 kilo bataka' = {name:'Potato', quantity:5, unit:'kg'})
+- area: delivery neighbourhood (match against available zones)
+- address: building name + flat/house number
+- paymentMethod: 'razorpay' (online/upi/card/1) or 'cod' (cash/cod/2/haath ma)
+
+Available delivery zones: ${zones}
+Available products: ${catalogNames}
+
+Return ONLY valid JSON, no markdown, no explanation:
+{"items":[{"name":"string","quantity":number,"unit":"string"}],"area":string|null,"address":string|null,"paymentMethod":"razorpay"|"cod"|null,"confidence":"full"|"partial"|"items_only"}
+
+Message:
+${text}`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const slice = extractJsonObject(raw);
+    if (!slice) return null;
+    const parsed = JSON.parse(slice) as FullOrderParse;
+    if (!parsed || !Array.isArray(parsed.items)) return null;
+    if (parsed.confidence !== "full" && parsed.confidence !== "partial" && parsed.confidence !== "items_only") {
+      return null;
+    }
+    return parsed;
+  } catch (e) {
+    console.error("[gemini] parseFullOrder error", e);
+    return null;
+  }
+}
+
+/** Lightweight intent routing for short messages. */
+export async function classifyIntent(text: string): Promise<MessageIntent> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return "order";
+  const genAI = new GoogleGenerativeAI(key);
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const prompt = `Classify this WhatsApp message from a customer of a grocery store in Gujarat, India.
+The message may be Gujarati, Hindi, English, or mixed.
+Return ONLY one of these exact strings (no other text):
+- 'order' — they want to buy or order something
+- 'greeting' — hello, hi, kem cho, namaste, helo, hey, good morning etc.
+- 'question' — asking about price, availability, timing, delivery, open/close
+- 'other' — anything else
+Message: ${text}`;
+  try {
+    const out = (await model.generateContent(prompt)).response.text().trim().toLowerCase();
+    if (out === "greeting" || out === "question" || out === "other" || out === "order") {
+      return out;
+    }
+    if (out.includes("greeting")) return "greeting";
+    if (out.includes("question")) return "question";
+    if (out.includes("other")) return "other";
+    return "order";
+  } catch (e) {
+    console.error("[gemini] classifyIntent error", e);
+    return "order";
   }
 }

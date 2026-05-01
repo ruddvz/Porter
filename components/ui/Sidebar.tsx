@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 export type SidebarNavItem = {
@@ -16,7 +16,7 @@ export type SidebarNavItem = {
 
 export type SidebarProps = {
   brand?: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   items: SidebarNavItem[];
   userName: string;
   userAvatarUrl?: string | null;
@@ -69,7 +69,7 @@ export function Sidebar({
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl tracking-wide text-porter-green-500">{brand}</p>
-            {subtitle && <p className="truncate text-xs text-porter-text-secondary">{subtitle}</p>}
+            {subtitle != null && <div className="truncate text-xs text-porter-text-secondary">{subtitle}</div>}
           </div>
         )}
         <button

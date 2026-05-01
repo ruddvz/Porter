@@ -28,6 +28,8 @@ export type ConversationState =
   | "complete"
   | "failed";
 
+export type BotLanguagePreference = "auto" | "gujarati" | "hindi" | "english";
+
 export interface Seller {
   id: string;
   user_id: string;
@@ -44,6 +46,9 @@ export interface Seller {
   meta_phone_number_id: string | null;
   meta_access_token: string | null;
   cod_enabled: boolean;
+  bot_intro_message?: string | null;
+  bot_language?: BotLanguagePreference | string | null;
+  razorpay_test_mode?: boolean | null;
 }
 
 export interface Product {
@@ -108,6 +113,8 @@ export interface Conversation {
   context: ConversationContext | null;
   last_message_at: string | null;
   created_at: string;
+  nudge_count?: number | null;
+  last_nudge_at?: string | null;
 }
 
 /** JSON stored in conversations.context during the bot flow. */
@@ -128,6 +135,40 @@ export interface ParsedLineItem {
   unit: string;
   unit_price: number;
   total_price: number;
+}
+
+/** Raw Gemini output for full-order parse (before fuzzy product match). */
+export interface ParsedFullOrderItem {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface FullOrderParse {
+  items: ParsedFullOrderItem[];
+  area: string | null;
+  address: string | null;
+  paymentMethod: "razorpay" | "cod" | null;
+  confidence: "full" | "partial" | "items_only";
+}
+
+export type MessageIntent = "order" | "greeting" | "question" | "other";
+
+export interface AdminUser {
+  id: string;
+  user_id: string;
+  email: string;
+  role: "super_admin" | "support";
+  created_at: string;
+}
+
+export interface PlatformEvent {
+  id: string;
+  admin_id: string | null;
+  event_type: string;
+  target_seller_id: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 export interface MetaWebhookPayload {
