@@ -2,6 +2,8 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Product } from "@/types";
+import { filterProductsByFuzzySearch } from "@/lib/fuzzy";
+import { isProductListedForBot } from "@/lib/product-catalog";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -16,6 +18,18 @@ const PRESET_CATEGORIES = ["Vegetables", "Dairy", "Staples", "Beverages", "Snack
 const UNITS = ["kg", "litre", "pkt", "piece", "dozen", "box"] as const;
 
 const PRESET_SET = new Set(PRESET_CATEGORIES.map((c) => c.toLowerCase()));
+
+function stockLevelLabel(p: Product): string | null {
+  const sq = p.stock_quantity ?? (p.in_stock ? 1 : 0);
+  if (sq <= 0) return "Out of stock";
+  if (sq <= 5) return "Low stock";
+  return null;
+}
+
+function stockLevelVariant(p: Product): "cancelled" | "cod" {
+  const sq = p.stock_quantity ?? (p.in_stock ? 1 : 0);
+  return sq <= 0 ? "cancelled" : "cod";
+}
 
 export default function InventoryClient({ initialProducts }: { initialProducts: Product[] }) {
   const supabase = createSupabaseBrowserClient();
@@ -37,13 +51,11 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
   }, [products]);
 
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    const byCat = products.filter((p) => {
       if (category !== "all" && p.category !== category) return false;
-      const q = search.trim().toLowerCase();
-      if (!q) return true;
-      if (p.name.toLowerCase().includes(q)) return true;
-      return (p.aliases ?? []).some((a) => a.toLowerCase().includes(q));
+      return true;
     });
+    return filterProductsByFuzzySearch(byCat, search);
   }, [products, search, category]);
 
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
@@ -56,8 +68,11 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
   async function bulkOutOfStock() {
     if (!selectedIds.length) return;
     const prev = products;
-    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, in_stock: false } : x)));
-    const { error } = await supabase.from("products").update({ in_stock: false }).in("id", selectedIds);
+    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, in_stock: false, is_active: false, stock_quantity: 0 } : x)));
+    const { error } = await supabase
+      .from("products")
+      .update({ in_stock: false, is_active: false, stock_quantity: 0 })
+      .in("id", selectedIds);
     if (error) {
       setProducts(prev);
       toast(error.message, "error");
@@ -166,6 +181,14 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
               </button>
             </div>
             <p className={`pr-16 text-title text-porter-text-primary ${editMode ? "pl-8" : ""}`}>{p.name}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {!isProductListedForBot(p) && (
+                <Badge kind="status" variant="cancelled" label="Hidden from bot" size="sm" />
+              )}
+              {stockLevelLabel(p) && (
+                <Badge kind="status" variant={stockLevelVariant(p)} label={stockLevelLabel(p)!} size="sm" />
+              )}
+            </div>
             <div className="mt-2 flex flex-wrap gap-1">
               {(p.aliases ?? []).slice(0, 8).map((a) => (
                 <span key={a} className="rounded-md border border-porter-bg-border bg-porter-bg-raised px-1.5 py-0.5 text-[10px] text-porter-text-muted">
@@ -182,17 +205,24 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
               </div>
             )}
             <label className="mt-4 flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
-              <span className="text-sm font-semibold text-porter-text-secondary">In stock</span>
+              <span className="text-sm font-semibold text-porter-text-secondary">Listed in bot</span>
               <input
                 type="checkbox"
-                checked={p.in_stock}
+                checked={isProductListedForBot(p)}
                 onChange={async (e) => {
-                  const in_stock = e.target.checked;
-                  const prev = p.in_stock;
-                  setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_stock } : x)));
-                  const { error } = await supabase.from("products").update({ in_stock }).eq("id", p.id);
+                  const listed = e.target.checked;
+                  const snapshot = {
+                    in_stock: p.in_stock,
+                    is_active: p.is_active !== false,
+                    stock_quantity: p.stock_quantity ?? (p.in_stock ? 1 : 0),
+                  };
+                  const next = listed
+                    ? { is_active: true, stock_quantity: Math.max(1, snapshot.stock_quantity || 1), in_stock: true }
+                    : { is_active: false, stock_quantity: 0, in_stock: false };
+                  setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...next } : x)));
+                  const { error } = await supabase.from("products").update(next).eq("id", p.id);
                   if (error) {
-                    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_stock: prev } : x)));
+                    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...snapshot } : x)));
                     toast(error.message, "error");
                   }
                 }}
@@ -267,6 +297,8 @@ function ProductModal({
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
   const [name, setName] = useState(product?.name ?? "");
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [imageUrl, setImageUrl] = useState(product?.image_url ?? "");
   const [aliasInput, setAliasInput] = useState("");
   const [aliasChips, setAliasChips] = useState<string[]>(product?.aliases ?? []);
   const [categoryMode, setCategoryMode] = useState<"preset" | "custom">(() => {
@@ -284,7 +316,8 @@ function ProductModal({
   });
   const [price, setPrice] = useState(String(product?.price ?? ""));
   const [unit, setUnit] = useState(product?.unit ?? "kg");
-  const [inStock, setInStock] = useState(product?.in_stock ?? true);
+  const [stockQty, setStockQty] = useState(String(product?.stock_quantity ?? (product?.in_stock ? 1 : 0)));
+  const [activeInBot, setActiveInBot] = useState(product ? isProductListedForBot(product) : true);
   const [busy, setBusy] = useState(false);
 
   function addAliasesFromInput() {
@@ -321,11 +354,18 @@ function ProductModal({
       return;
     }
     const priceNum = parseFloat(price);
+    const sq = parseInt(stockQty, 10);
     if (!name.trim() || !Number.isFinite(priceNum) || priceNum <= 0) {
       toast("Name and price greater than 0 are required", "error");
       setBusy(false);
       return;
     }
+    if (!Number.isFinite(sq) || sq < 0) {
+      toast("Stock quantity must be zero or a positive whole number", "error");
+      setBusy(false);
+      return;
+    }
+    const listed = activeInBot && sq > 0;
     const category =
       categoryMode === "custom"
         ? categoryCustom.trim() || null
@@ -336,11 +376,15 @@ function ProductModal({
     const row = {
       seller_id: seller.id,
       name: name.trim(),
+      description: description.trim() || null,
+      image_url: imageUrl.trim() || null,
       aliases: aliasChips,
       category,
       price: priceNum,
       unit,
-      in_stock: inStock,
+      stock_quantity: listed ? Math.max(1, sq) : 0,
+      is_active: listed,
+      in_stock: listed,
     };
     if (product) {
       const { data, error } = await supabase.from("products").update(row).eq("id", product.id).select("*").single();
@@ -373,6 +417,21 @@ function ProductModal({
     >
       <div className="space-y-4">
         <Input.Text id="p-name" label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
+        <Input.Textarea
+          id="p-desc"
+          label="Description"
+          rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional — shown in dashboard; bot uses name and aliases"
+        />
+        <Input.Text
+          id="p-img"
+          label="Image URL"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="Optional — paste a public image URL (Supabase Storage in a later session)"
+        />
         <div>
           <Input.Text
             id="p-alias"
@@ -433,9 +492,24 @@ function ProductModal({
             </option>
           ))}
         </Input.Select>
+        <Input.Text
+          id="p-stock"
+          label="Stock quantity"
+          inputVariant="number"
+          value={stockQty}
+          onChange={(e) => setStockQty(e.target.value)}
+          min={0}
+          step={1}
+          hint="0 = out of stock. Listed in bot requires quantity ≥ 1."
+        />
         <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
-          <span className="text-sm font-semibold text-porter-text-secondary">In stock</span>
-          <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="h-6 w-11 accent-porter-green-500" />
+          <span className="text-sm font-semibold text-porter-text-secondary">Listed in WhatsApp bot</span>
+          <input
+            type="checkbox"
+            checked={activeInBot}
+            onChange={(e) => setActiveInBot(e.target.checked)}
+            className="h-6 w-11 accent-porter-green-500"
+          />
         </label>
       </div>
     </Modal>

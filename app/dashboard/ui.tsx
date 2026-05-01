@@ -20,7 +20,7 @@ import {
 } from "@/lib/orders-ui";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Order, Seller } from "@/types";
-import { Bike, Check, Package, X } from "lucide-react";
+import { Check, Package, Truck, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 
@@ -93,12 +93,15 @@ export default function LiveOrdersBoard({
   }, [typed]);
 
   const board = useMemo(() => {
+    const cancelled = typed.filter((o) => o.status === "cancelled");
     const active = typed.filter((o) => o.status !== "cancelled");
     return {
       pending: active.filter((o) => o.status === "pending"),
-      confirmed: active.filter((o) => o.status === "confirmed" || o.status === "paid"),
+      confirmed: active.filter((o) => o.status === "confirmed"),
+      preparing: active.filter((o) => o.status === "preparing" || o.status === "paid"),
       out: active.filter((o) => o.status === "out_for_delivery"),
       delivered: active.filter((o) => o.status === "delivered"),
+      cancelled,
     };
   }, [typed]);
 
@@ -147,7 +150,7 @@ export default function LiveOrdersBoard({
           <StatCard label="Paid orders" value={stats.paidCount} valueTone="success" />
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-3" ref={boardRef}>
+        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-6 xl:gap-3" ref={boardRef}>
           <KanbanColumn title="Pending" count={board.pending.length}>
             {board.pending.length === 0 ? (
               <EmptyState title="No pending orders" description="New WhatsApp orders appear here in real time." />
@@ -173,9 +176,18 @@ export default function LiveOrdersBoard({
               ))
             )}
           </KanbanColumn>
+          <KanbanColumn title="Preparing" count={board.preparing.length}>
+            {board.preparing.length === 0 ? (
+              <EmptyState title="Nothing in prep" description="Paid orders and kitchen prep show here." />
+            ) : (
+              board.preparing.map((o) => (
+                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
+              ))
+            )}
+          </KanbanColumn>
           <KanbanColumn title="Out for delivery" count={board.out.length}>
             {board.out.length === 0 ? (
-              <EmptyState title="Nothing out" description="Dispatch confirmed orders when the rider leaves." />
+              <EmptyState title="Nothing out" description="Dispatch when the rider leaves." />
             ) : (
               board.out.map((o) => (
                 <BoardOrderCard key={o.id} order={o} nowMs={nowMs} onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
@@ -187,6 +199,15 @@ export default function LiveOrdersBoard({
               <EmptyState title="No deliveries yet" description="Completed orders land here." />
             ) : (
               board.delivered.map((o) => (
+                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} dimmed onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
+              ))
+            )}
+          </KanbanColumn>
+          <KanbanColumn title="Cancelled" count={board.cancelled.length}>
+            {board.cancelled.length === 0 ? (
+              <EmptyState title="No cancelled" description="Cancelled orders are kept for records." />
+            ) : (
+              board.cancelled.map((o) => (
                 <BoardOrderCard key={o.id} order={o} nowMs={nowMs} dimmed onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
               ))
             )}
@@ -254,8 +275,14 @@ function BoardOrderCard({
         </>
       )}
       {(order.status === "confirmed" || order.status === "paid") && (
+        <Button size="sm" type="button" onClick={() => onPatch({ status: "preparing" })}>
+          <Package className="h-4 w-4" />
+          Preparing
+        </Button>
+      )}
+      {(order.status === "preparing" || order.status === "paid") && (
         <Button size="sm" type="button" onClick={() => onPatch({ status: "out_for_delivery" })}>
-          <Bike className="h-4 w-4" />
+          <Truck className="h-4 w-4" />
           Dispatch
         </Button>
       )}
@@ -265,7 +292,7 @@ function BoardOrderCard({
           type="button"
           onClick={() => onPatch({ status: "delivered", delivered_at: new Date().toISOString() })}
         >
-          <Package className="h-4 w-4" />
+          <Check className="h-4 w-4" />
           Delivered
         </Button>
       )}

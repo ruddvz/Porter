@@ -3,6 +3,7 @@ import { classifyIntent, parseFullOrder, parseOrderText } from "@/lib/gemini";
 import { sendMessage } from "@/lib/meta-whatsapp";
 import { createPaymentLink } from "@/lib/razorpay";
 import { fuzzyMatchProducts } from "@/lib/fuzzy";
+import { isProductListedForBot } from "@/lib/product-catalog";
 import type {
   Conversation,
   ConversationContext,
@@ -105,6 +106,11 @@ export async function handleIncomingCustomerMessage(
     };
   }
 
+  await supabase
+    .from("conversations")
+    .update({ nudge_count: 0, last_nudge_at: null })
+    .eq("id", conversation.id);
+
   const welcomeAlreadySent =
     conversation.state === "collecting_items" &&
     (await sendFirstContactWelcomeIfNeeded(
@@ -196,13 +202,9 @@ async function runCollectingItems(
   now: string,
   welcomeAlreadySent: boolean
 ) {
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("seller_id", seller.id)
-    .eq("in_stock", true);
+  const { data: products } = await supabase.from("products").select("*").eq("seller_id", seller.id);
 
-  const list = (products ?? []) as Product[];
+  const list = ((products ?? []) as Product[]).filter(isProductListedForBot);
   const zones = seller.delivery_zones ?? [];
 
   if (matchSameOrderShortcut(text)) {

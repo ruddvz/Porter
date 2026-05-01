@@ -33,3 +33,38 @@ export function fuzzyMatchProducts(text: string, products: Product[]): FuzzyMatc
 }
 
 export { THRESHOLD as FUZZY_CONFIDENCE_THRESHOLD };
+
+/** Client-side search: substring on name/aliases/category/description + Fuse on full product names. */
+export function filterProductsByFuzzySearch(products: Product[], query: string): Product[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return products;
+
+  const substringHits = products.filter((p) => {
+    if (p.name.toLowerCase().includes(q)) return true;
+    if ((p.category ?? "").toLowerCase().includes(q)) return true;
+    if ((p.description ?? "").toLowerCase().includes(q)) return true;
+    return (p.aliases ?? []).some((a) => a.toLowerCase().includes(q));
+  });
+  if (substringHits.length) return substringHits;
+
+  const fuse = new Fuse(products, {
+    keys: ["name", "category", "description"],
+    includeScore: true,
+    threshold: 0.45,
+    ignoreLocation: true,
+  });
+  const results = fuse.search(query.trim());
+  const out: Product[] = [];
+  const seen = new Set<string>();
+  for (const r of results) {
+    if (r.score == null) continue;
+    const confidence = 1 - r.score;
+    if (confidence < THRESHOLD) continue;
+    const p = r.item;
+    if (!seen.has(p.id)) {
+      seen.add(p.id);
+      out.push(p);
+    }
+  }
+  return out;
+}
