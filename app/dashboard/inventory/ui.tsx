@@ -1,7 +1,10 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import type { Product } from "@/types";
+import type { Product, Seller } from "@/types";
+import { filterProductsByFuzzySearch } from "@/lib/fuzzy";
+import { isProductListedForBot } from "@/lib/product-catalog";
+import { checkGate } from "@/lib/plan-gates";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,7 +20,19 @@ const UNITS = ["kg", "litre", "pkt", "piece", "dozen", "box"] as const;
 
 const PRESET_SET = new Set(PRESET_CATEGORIES.map((c) => c.toLowerCase()));
 
-export default function InventoryClient({ initialProducts }: { initialProducts: Product[] }) {
+function stockLevelLabel(p: Product): string | null {
+  const sq = p.stock_quantity ?? (p.in_stock ? 1 : 0);
+  if (sq <= 0) return "Out of stock";
+  if (sq <= 5) return "Low stock";
+  return null;
+}
+
+function stockLevelVariant(p: Product): "cancelled" | "cod" {
+  const sq = p.stock_quantity ?? (p.in_stock ? 1 : 0);
+  return sq <= 0 ? "cancelled" : "cod";
+}
+
+export default function InventoryClient({ seller, initialProducts }: { seller: Seller; initialProducts: Product[] }) {
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
   const [products, setProducts] = useState(initialProducts);
@@ -37,13 +52,8 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
   }, [products]);
 
   const filtered = useMemo(() => {
-    return products.filter((p) => {
-      if (category !== "all" && p.category !== category) return false;
-      const q = search.trim().toLowerCase();
-      if (!q) return true;
-      if (p.name.toLowerCase().includes(q)) return true;
-      return (p.aliases ?? []).some((a) => a.toLowerCase().includes(q));
-    });
+    const byCat = products.filter((p) => (category === "all" ? true : p.category === category));
+    return filterProductsByFuzzySearch(byCat, search);
   }, [products, search, category]);
 
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
@@ -56,8 +66,11 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
   async function bulkOutOfStock() {
     if (!selectedIds.length) return;
     const prev = products;
-    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, in_stock: false } : x)));
-    const { error } = await supabase.from("products").update({ in_stock: false }).in("id", selectedIds);
+    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, in_stock: false, is_active: false, stock_quantity: 0 } : x)));
+    const { error } = await supabase
+      .from("products")
+      .update({ in_stock: false, is_active: false, stock_quantity: 0 })
+      .in("id", selectedIds);
     if (error) {
       setProducts(prev);
       toast(error.message, "error");
@@ -91,7 +104,7 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
           inputVariant="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Products or aliases"
+          placeholder="Products, aliases, category"
           className="md:max-w-md"
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -166,13 +179,19 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
               </button>
             </div>
             <p className={`pr-16 text-title text-porter-text-primary ${editMode ? "pl-8" : ""}`}>{p.name}</p>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {(p.aliases ?? []).slice(0, 8).map((a) => (
-                <span key={a} className="rounded-md border border-porter-bg-border bg-porter-bg-raised px-1.5 py-0.5 text-[10px] text-porter-text-muted">
-                  {a}
-                </span>
-              ))}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {!isProductListedForBot(p) && <Badge kind="status" variant="cancelled" label="Hidden from bot" size="sm" />}
+              {stockLevelLabel(p) && <Badge kind="status" variant={stockLevelVariant(p)} label={stockLevelLabel(p)!} size="sm" />}
             </div>
+            {(p.aliases ?? []).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {(p.aliases ?? []).slice(0, 8).map((a) => (
+                  <span key={a} className="rounded-md border border-porter-bg-border bg-porter-bg-raised px-1.5 py-0.5 text-[10px] text-porter-text-muted">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="mt-3 font-display text-2xl tracking-wide text-porter-text-primary">
               ₹{p.price} <span className="text-sm font-sans text-porter-text-muted">/ {p.unit}</span>
             </p>
@@ -182,17 +201,24 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
               </div>
             )}
             <label className="mt-4 flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
-              <span className="text-sm font-semibold text-porter-text-secondary">In stock</span>
+              <span className="text-sm font-semibold text-porter-text-secondary">Listed in bot</span>
               <input
                 type="checkbox"
-                checked={p.in_stock}
+                checked={isProductListedForBot(p)}
                 onChange={async (e) => {
-                  const in_stock = e.target.checked;
-                  const prev = p.in_stock;
-                  setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_stock } : x)));
-                  const { error } = await supabase.from("products").update({ in_stock }).eq("id", p.id);
+                  const listed = e.target.checked;
+                  const snapshot = {
+                    in_stock: p.in_stock,
+                    is_active: p.is_active !== false,
+                    stock_quantity: p.stock_quantity ?? (p.in_stock ? 1 : 0),
+                  };
+                  const next = listed
+                    ? { is_active: true, stock_quantity: Math.max(1, snapshot.stock_quantity || 1), in_stock: true }
+                    : { is_active: false, stock_quantity: 0, in_stock: false };
+                  setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...next } : x)));
+                  const { error } = await supabase.from("products").update(next).eq("id", p.id);
                   if (error) {
-                    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, in_stock: prev } : x)));
+                    setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...snapshot } : x)));
                     toast(error.message, "error");
                   }
                 }}
@@ -203,9 +229,7 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <EmptyState title="No products match" description="Try a different search or category." />
-      )}
+      {filtered.length === 0 && <EmptyState title="No products match" description="Try a different search or category." />}
 
       {editMode && selectedCount > 0 && (
         <div className="fixed bottom-4 left-3 right-3 z-40 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-porter-bg-border bg-porter-bg-raised p-3 shadow-modal md:left-auto md:right-6 md:min-w-[420px]">
@@ -223,7 +247,9 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
 
       {modal && (
         <ProductModal
+          seller={seller}
           product={modal === "new" ? null : modal}
+          productCount={products.length}
           onClose={() => setModal(null)}
           onSaved={(p) => {
             if (modal === "new") setProducts((prev) => [p, ...prev]);
@@ -256,17 +282,23 @@ export default function InventoryClient({ initialProducts }: { initialProducts: 
 }
 
 function ProductModal({
+  seller,
   product,
+  productCount,
   onClose,
   onSaved,
 }: {
+  seller: Seller;
   product: Product | null;
+  productCount: number;
   onClose: () => void;
   onSaved: (p: Product) => void;
 }) {
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
   const [name, setName] = useState(product?.name ?? "");
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [imageUrl, setImageUrl] = useState(product?.image_url ?? "");
   const [aliasInput, setAliasInput] = useState("");
   const [aliasChips, setAliasChips] = useState<string[]>(product?.aliases ?? []);
   const [categoryMode, setCategoryMode] = useState<"preset" | "custom">(() => {
@@ -284,8 +316,10 @@ function ProductModal({
   });
   const [price, setPrice] = useState(String(product?.price ?? ""));
   const [unit, setUnit] = useState(product?.unit ?? "kg");
-  const [inStock, setInStock] = useState(product?.in_stock ?? true);
+  const [stockQty, setStockQty] = useState(String(product?.stock_quantity ?? (product?.in_stock ? 1 : 0)));
+  const [activeInBot, setActiveInBot] = useState(product ? isProductListedForBot(product) : true);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   function addAliasesFromInput() {
     const parts = aliasInput
@@ -304,6 +338,29 @@ function ProductModal({
     }
   }
 
+  async function uploadImage(file: File) {
+    setUploading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast("Not signed in", "error");
+      setUploading(false);
+      return;
+    }
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: true });
+    setUploading(false);
+    if (error) {
+      toast(error.message, "error");
+      return;
+    }
+    const { data: pub } = supabase.storage.from("product-images").getPublicUrl(path);
+    setImageUrl(pub.publicUrl);
+    toast("Image uploaded", "success");
+  }
+
   async function save() {
     setBusy(true);
     const {
@@ -314,18 +371,33 @@ function ProductModal({
       setBusy(false);
       return;
     }
-    const { data: seller } = await supabase.from("sellers").select("id").eq("user_id", user.id).single();
-    if (!seller) {
+    const { data: sellerRow } = await supabase.from("sellers").select("id, plan").eq("user_id", user.id).single();
+    if (!sellerRow) {
       toast("No seller profile", "error");
       setBusy(false);
       return;
     }
     const priceNum = parseFloat(price);
+    const sq = parseInt(stockQty, 10);
     if (!name.trim() || !Number.isFinite(priceNum) || priceNum <= 0) {
       toast("Name and price greater than 0 are required", "error");
       setBusy(false);
       return;
     }
+    if (!Number.isFinite(sq) || sq < 0) {
+      toast("Stock quantity must be zero or a positive whole number", "error");
+      setBusy(false);
+      return;
+    }
+    if (!product) {
+      const gate = checkGate(seller, "products", { productCount: productCount + 1 });
+      if (!gate.ok) {
+        toast(gate.reason, "error");
+        setBusy(false);
+        return;
+      }
+    }
+    const listed = activeInBot && sq > 0;
     const category =
       categoryMode === "custom"
         ? categoryCustom.trim() || null
@@ -334,13 +406,17 @@ function ProductModal({
           : categoryPreset;
 
     const row = {
-      seller_id: seller.id,
+      seller_id: sellerRow.id,
       name: name.trim(),
+      description: description.trim() || null,
+      image_url: imageUrl.trim() || null,
       aliases: aliasChips,
       category,
       price: priceNum,
       unit,
-      in_stock: inStock,
+      stock_quantity: listed ? Math.max(1, sq) : 0,
+      is_active: listed,
+      in_stock: listed,
     };
     if (product) {
       const { data, error } = await supabase.from("products").update(row).eq("id", product.id).select("*").single();
@@ -373,6 +449,28 @@ function ProductModal({
     >
       <div className="space-y-4">
         <Input.Text id="p-name" label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
+        <Input.Textarea
+          id="p-desc"
+          label="Description"
+          rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional"
+        />
+        <Input.Text id="p-img" label="Image URL" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Or upload below" />
+        <div>
+          <p className="mb-1.5 text-label text-porter-text-secondary">Upload to Supabase Storage</p>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={uploading}
+            className="text-sm text-porter-text-secondary"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadImage(f);
+            }}
+          />
+        </div>
         <div>
           <Input.Text
             id="p-alias"
@@ -381,7 +479,7 @@ function ProductModal({
             onChange={(e) => setAliasInput(e.target.value)}
             onKeyDown={onAliasKeyDown}
             onBlur={() => addAliasesFromInput()}
-            placeholder="e.g. bataka, aloo, potato — comma or Enter to add"
+            placeholder="e.g. bataka, aloo — comma or Enter"
           />
           {aliasChips.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
@@ -433,10 +531,14 @@ function ProductModal({
             </option>
           ))}
         </Input.Select>
+        <Input.Text id="p-stock" label="Stock quantity" inputVariant="number" value={stockQty} onChange={(e) => setStockQty(e.target.value)} min={0} step={1} />
         <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
-          <span className="text-sm font-semibold text-porter-text-secondary">In stock</span>
-          <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="h-6 w-11 accent-porter-green-500" />
+          <span className="text-sm font-semibold text-porter-text-secondary">Listed in WhatsApp bot</span>
+          <input type="checkbox" checked={activeInBot} onChange={(e) => setActiveInBot(e.target.checked)} className="h-6 w-11 accent-porter-green-500" />
         </label>
+        {seller.plan === "starter" && (
+          <p className="text-xs text-porter-text-muted">Starter plan: up to 50 products. Upgrade for unlimited.</p>
+        )}
       </div>
     </Modal>
   );

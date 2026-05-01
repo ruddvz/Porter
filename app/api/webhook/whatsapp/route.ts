@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const mode = url.searchParams.get("hub.mode");
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
-  const verify = process.env.META_WEBHOOK_VERIFY_TOKEN;
+  const verify = process.env.META_WEBHOOK_VERIFY_TOKEN ?? process.env.META_VERIFY_TOKEN;
   if (mode === "subscribe" && token && verify && token === verify && challenge) {
     return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
   }

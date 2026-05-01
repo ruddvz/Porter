@@ -104,6 +104,16 @@ export function OrderCard({
           <button
             type="button"
             disabled={busy}
+            onClick={() => patchOrder({ status: "preparing" })}
+            className="rounded-lg bg-[#25D366] px-2 py-1 text-xs font-semibold text-black"
+          >
+            Preparing
+          </button>
+        )}
+        {(order.status === "preparing" || order.status === "paid") && (
+          <button
+            type="button"
+            disabled={busy}
             onClick={() => patchOrder({ status: "out_for_delivery" })}
             className="rounded-lg bg-[#FF6B35] px-2 py-1 text-xs font-semibold text-black"
           >

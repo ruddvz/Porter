@@ -48,6 +48,7 @@ export default function OrderHistoryClient({
     return orders.filter((o) => {
       if (filter === "pending" && o.status !== "pending") return false;
       if (filter === "confirmed" && o.status !== "confirmed") return false;
+      if (filter === "preparing" && o.status !== "preparing") return false;
       if (filter === "paid" && o.payment_status !== "paid") return false;
       if (filter === "cod" && o.payment_method !== "cod") return false;
       if (filter === "delivered" && o.status !== "delivered") return false;
@@ -125,8 +126,7 @@ export default function OrderHistoryClient({
   const pills: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
     { key: "pending", label: "Pending" },
-    { key: "confirmed", label: "Confirmed" },
-    { key: "paid", label: "Paid" },
+    { key: "preparing", label: "Preparing" },
     { key: "cod", label: "COD" },
     { key: "delivered", label: "Delivered" },
     { key: "cancelled", label: "Cancelled" },
@@ -229,7 +229,10 @@ export default function OrderHistoryClient({
                   <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-porter-bg-surface" onClick={() => setPanel(o)}>
                     View detail
                   </button>
-                  {(o.status === "pending" || o.status === "confirmed") && (
+                  {(o.status === "pending" ||
+                    o.status === "confirmed" ||
+                    o.status === "preparing" ||
+                    o.status === "paid") && (
                     <button
                       type="button"
                       className="block w-full px-3 py-2 text-left text-sm text-porter-status-cancelled hover:bg-porter-bg-surface"

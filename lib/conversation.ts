@@ -3,6 +3,9 @@ import { classifyIntent, parseFullOrder, parseOrderText } from "@/lib/gemini";
 import { sendMessage } from "@/lib/meta-whatsapp";
 import { createPaymentLink } from "@/lib/razorpay";
 import { fuzzyMatchProducts } from "@/lib/fuzzy";
+import { isProductListedForBot } from "@/lib/product-catalog";
+import { checkGate } from "@/lib/plan-gates";
+import { getRazorpayKeysForSeller } from "@/lib/seller-credentials";
 import type {
   Conversation,
   ConversationContext,
@@ -105,6 +108,11 @@ export async function handleIncomingCustomerMessage(
     };
   }
 
+  await supabase
+    .from("conversations")
+    .update({ nudge_count: 0, last_nudge_at: null })
+    .eq("id", conversation.id);
+
   const welcomeAlreadySent =
     conversation.state === "collecting_items" &&
     (await sendFirstContactWelcomeIfNeeded(
@@ -139,6 +147,17 @@ export async function handleIncomingCustomerMessage(
   }
 }
 
+function formatWorkingHoursHint(h: Seller["working_hours"]): string {
+  if (!h || typeof h !== "object") return "";
+  const parts: string[] = [];
+  for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const) {
+    const x = h[d];
+    if (x?.open && x?.close) parts.push(`${d}: ${x.open}–${x.close}`);
+  }
+  if (!parts.length) return "";
+  return `\n\nHours:\n${parts.join("\n")}`;
+}
+
 /** First-contact welcome: custom `bot_intro_message` or default copy. Returns true if a message was sent. */
 async function sendFirstContactWelcomeIfNeeded(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
@@ -149,7 +168,7 @@ async function sendFirstContactWelcomeIfNeeded(
   isFirstMessage: boolean
 ): Promise<boolean> {
   if (!isFirstMessage) return false;
-  const custom = seller.bot_intro_message?.trim();
+  const custom = seller.plan === "growth" ? seller.bot_intro_message?.trim() : "";
   const zones = (seller.delivery_zones ?? []).filter(Boolean).join(" · ");
   const defaultWelcome = `Kem cho! 👋 Welcome to ${seller.store_name} on Porter.
 
@@ -163,7 +182,7 @@ I understand Gujarati, Hindi and English!
 Delivery areas: ${zones || "—"}
 Payment: Online (UPI/Card) or Cash on Delivery
 
-Send your list whenever you're ready 🛒`;
+Send your list whenever you're ready 🛒${formatWorkingHoursHint(seller.working_hours ?? null)}`;
 
   const msg = custom && custom.length > 0 ? custom : defaultWelcome;
   await sendMessage(phone, msg, seller);
@@ -196,13 +215,9 @@ async function runCollectingItems(
   now: string,
   welcomeAlreadySent: boolean
 ) {
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("seller_id", seller.id)
-    .eq("in_stock", true);
+  const { data: products } = await supabase.from("products").select("*").eq("seller_id", seller.id);
 
-  const list = (products ?? []) as Product[];
+  const list = ((products ?? []) as Product[]).filter(isProductListedForBot);
   const zones = seller.delivery_zones ?? [];
 
   if (matchSameOrderShortcut(text)) {
@@ -308,6 +323,23 @@ async function continueNormalParse(
     return;
   }
 
+  for (const it of parsed) {
+    if (!it.product_id) continue;
+    const { data: prow } = await supabase.from("products").select("stock_quantity, in_stock, name").eq("id", it.product_id).maybeSingle();
+    if (!prow) continue;
+    const sq =
+      typeof (prow as { stock_quantity?: number }).stock_quantity === "number"
+        ? (prow as { stock_quantity: number }).stock_quantity
+        : (prow as { in_stock: boolean }).in_stock
+          ? 1
+          : 0;
+    if (it.quantity > sq) {
+      const oos = seller.bot_out_of_stock_message?.trim() || "Sorry, that item is out of stock right now.";
+      await sendMessage(phone, `${oos}\n${(prow as { name: string }).name}: requested ${it.quantity}, available ${sq}.`, seller);
+      await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
+      return;
+    }
+  }
   const total = round2(parsed.reduce((s, i) => s + i.total_price, 0));
   const lines = parsed.map(
     (i) => `• ${i.product_name} — ${i.quantity} ${i.unit} × ₹${i.unit_price} = ₹${i.total_price}`
@@ -521,6 +553,43 @@ async function handleSameAsLastTime(
   return true;
 }
 
+async function adjustProductStockAfterOrder(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  items: ParsedLineItem[]
+) {
+  for (const it of items) {
+    if (!it.product_id) continue;
+    const { data: row } = await supabase.from("products").select("stock_quantity, in_stock").eq("id", it.product_id).maybeSingle();
+    if (!row) continue;
+    const prev = (row as { stock_quantity?: number; in_stock: boolean }).stock_quantity;
+    const sq = typeof prev === "number" ? prev : row.in_stock ? 1 : 0;
+    const next = Math.max(0, sq - it.quantity);
+    await supabase
+      .from("products")
+      .update({
+        stock_quantity: next,
+        in_stock: next > 0,
+        is_active: next > 0,
+      })
+      .eq("id", it.product_id);
+  }
+}
+
+async function notifyOrderPush(sellerId: string, title: string, body: string) {
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const secret = process.env.PUSH_INTERNAL_SECRET;
+  if (!base || !secret) return;
+  try {
+    await fetch(`${base}/api/push/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-porter-push-secret": secret },
+      body: JSON.stringify({ seller_id: sellerId, title, body }),
+    });
+  } catch (e) {
+    console.error("[conversation] push notify", e);
+  }
+}
+
 async function finalizeOrderFromContext(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
   seller: Seller,
@@ -535,8 +604,23 @@ async function finalizeOrderFromContext(
   const address = (ctx.address ?? "").trim();
   const total = ctx.order_total ?? round2(items.reduce((s, i) => s + i.total_price, 0));
 
-  if (paymentMethod === "razorpay" && (!seller.razorpay_key_id || !seller.razorpay_key_secret)) {
+  const rzp = getRazorpayKeysForSeller(seller);
+  if (paymentMethod === "razorpay" && !rzp) {
     await sendMessage(phone, "Online payment setup pending on store side. Store ne call karo.", seller);
+    return;
+  }
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const { count: monthOrders } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("seller_id", seller.id)
+    .gte("created_at", startOfMonth.toISOString());
+  const gate = checkGate(seller, "orders_monthly", { ordersThisMonth: (monthOrders ?? 0) + 1 });
+  if (!gate.ok) {
+    await sendMessage(phone, `Order limit reached for this month. ${gate.reason}`, seller);
     return;
   }
 
@@ -591,6 +675,7 @@ async function finalizeOrderFromContext(
     total_price: i.total_price,
   }));
   await supabase.from("order_items").insert(orderItems);
+  await adjustProductStockAfterOrder(supabase, items);
 
   if (customerId) {
     const { data: c } = await supabase.from("customers").select("order_count").eq("id", customerId).single();
@@ -601,12 +686,22 @@ async function finalizeOrderFromContext(
   const summaryLines = items.map((i) => `• ${i.product_name} — ${i.quantity} ${i.unit} — ₹${i.total_price}`);
   const summary = summaryLines.join("\n");
 
-  if (paymentMethod === "razorpay") {
+  const tpl = seller.bot_order_confirmation_template?.trim();
+  function formatConfirm(extra: string) {
+    if (!tpl) return extra;
+    return tpl
+      .replace(/\{\{summary\}\}/g, summary)
+      .replace(/\{\{total\}\}/g, String(total))
+      .replace(/\{\{store\}\}/g, seller.store_name)
+      .replace(/\{\{id\}\}/g, order.id.slice(0, 8));
+  }
+
+  if (paymentMethod === "razorpay" && rzp) {
     const link = await createPaymentLink({
       amountPaise: Math.round(total * 100),
       order: order,
-      keyId: seller.razorpay_key_id!,
-      keySecret: seller.razorpay_key_secret!,
+      keyId: rzp.keyId,
+      keySecret: rzp.keySecret,
       callbackUrl: process.env.NEXT_PUBLIC_APP_URL
         ? `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
         : undefined,
@@ -639,7 +734,9 @@ async function finalizeOrderFromContext(
       })
       .eq("id", conversation.id);
 
-    const msg = `✅ Order confirmed!\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\n${link.short_url}\n\n*Porter — ${seller.store_name}*`;
+    const msg = formatConfirm(
+      `✅ Order confirmed!\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\n${link.short_url}\n\n*Porter — ${seller.store_name}*`
+    );
     await sendMessage(phone, msg, seller);
     return;
   }
@@ -653,8 +750,11 @@ async function finalizeOrderFromContext(
     })
     .eq("id", conversation.id);
 
-  const codMsg = `✅ Order confirmed!\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\nCash on delivery — pay rider ₹${total}\n\n*Porter — ${seller.store_name}*`;
+  const codMsg = formatConfirm(
+    `✅ Order confirmed!\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\nCash on delivery — pay rider ₹${total}\n\n*Porter — ${seller.store_name}*`
+  );
   await sendMessage(phone, codMsg, seller);
+  void notifyOrderPush(seller.id, "New order", `₹${total} — ${order.id.slice(0, 8)}`);
 }
 
 /** Records prepaid vs COD and asks for delivery area. */
