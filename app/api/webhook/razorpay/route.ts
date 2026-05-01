@@ -80,7 +80,7 @@ async function handlePaymentLinkPaid(linkId: string) {
     .update({
       payment_status: "paid",
       paid_at: now,
-      status: "confirmed",
+      status: "preparing",
     })
     .eq("id", order.id);
 

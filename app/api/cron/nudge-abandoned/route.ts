@@ -10,7 +10,13 @@ const NUDGE_STATES = [
   "collecting_payment_method",
   "collecting_area",
   "collecting_address",
+  "awaiting_payment",
 ] as const;
+
+/** Idle before first nudge (minutes). */
+const IDLE_MINUTES = 30;
+/** Do not nudge if last customer message older than this (hours). */
+const MAX_IDLE_HOURS = 24;
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -24,13 +30,17 @@ export async function GET(req: Request) {
   let nudged = 0;
   let skipped = 0;
 
+  const idleBefore = new Date(Date.now() - IDLE_MINUTES * 60 * 1000).toISOString();
+  const staleAfter = new Date(Date.now() - MAX_IDLE_HOURS * 60 * 60 * 1000).toISOString();
+
   const { data: rows, error } = await supabase
     .from("conversations")
     .select("*")
     .in("state", [...NUDGE_STATES])
-    .lt("last_message_at", new Date(Date.now() - 45 * 60 * 1000).toISOString())
-    .gt("last_message_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-    .or("nudge_count.is.null,nudge_count.lt.2");
+    .not("last_message_at", "is", null)
+    .lt("last_message_at", idleBefore)
+    .gt("last_message_at", staleAfter)
+    .or("nudge_count.is.null,nudge_count.eq.0");
 
   if (error) {
     console.error("[cron nudge] query", error);
@@ -40,7 +50,13 @@ export async function GET(req: Request) {
   for (const conv of rows ?? []) {
     const c = conv as Conversation;
     const nudgeCount = c.nudge_count ?? 0;
-    if (nudgeCount >= 2) {
+    if (nudgeCount >= 1) {
+      skipped++;
+      continue;
+    }
+
+    const lastNudgeAt = c.last_nudge_at ? new Date(c.last_nudge_at).getTime() : 0;
+    if (lastNudgeAt && Date.now() - lastNudgeAt < 24 * 60 * 60 * 1000) {
       skipped++;
       continue;
     }
@@ -101,6 +117,9 @@ ${zones || "Send your area name."}`;
     } else if (row.state === "collecting_address") {
       message = `Almost done! 🏠
 Just send your building name + flat/house number and your order is confirmed.`;
+    } else if (row.state === "awaiting_payment") {
+      message = `Still there? 💳
+Your payment link is waiting — complete payment when you're ready, or reply if you need help.`;
     } else {
       skipped++;
       continue;
@@ -112,7 +131,7 @@ Just send your building name + flat/house number and your order is confirmed.`;
       let q = supabase
         .from("conversations")
         .update({
-          nudge_count: nudgeCount + 1,
+          nudge_count: 1,
           last_nudge_at: new Date().toISOString(),
         })
         .eq("id", row.id);

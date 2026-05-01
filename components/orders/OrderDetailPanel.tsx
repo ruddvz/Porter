@@ -67,7 +67,7 @@ export default function OrderDetailPanel({
 
   const cancelOrder = useCallback(async () => {
     if (!o) return;
-    if (o.status !== "pending" && o.status !== "confirmed") return;
+    if (o.status !== "pending" && o.status !== "confirmed" && o.status !== "preparing" && o.status !== "paid") return;
     setBusy(true);
     const prev = { ...o };
     const updates = { status: "cancelled" as const };
@@ -107,7 +107,11 @@ export default function OrderDetailPanel({
 
   if (!o) return null;
 
-  const canCancel = o.status === "pending" || o.status === "confirmed";
+  const canCancel =
+    o.status === "pending" ||
+    o.status === "confirmed" ||
+    o.status === "preparing" ||
+    o.status === "paid";
 
   return (
     <>
@@ -236,8 +240,14 @@ export default function OrderDetailPanel({
                 {
                   key: "conf",
                   label: "Confirmed",
-                  done: ["confirmed", "paid", "out_for_delivery", "delivered"].includes(o.status),
-                  ts: ["confirmed", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
+                  done: ["confirmed", "preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
+                  ts: ["confirmed", "preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
+                },
+                {
+                  key: "prep",
+                  label: "Preparing",
+                  done: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
+                  ts: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
                 },
                 { key: "paid", label: "Paid", done: o.payment_status === "paid", ts: o.paid_at },
                 {

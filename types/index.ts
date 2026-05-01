@@ -5,6 +5,7 @@ export type SellerPlan = "starter" | "growth";
 export type OrderStatus =
   | "pending"
   | "confirmed"
+  | "preparing"
   | "paid"
   | "out_for_delivery"
   | "delivered"
@@ -60,6 +61,10 @@ export interface Product {
   price: number;
   unit: string;
   in_stock: boolean;
+  description?: string | null;
+  image_url?: string | null;
+  is_active?: boolean;
+  stock_quantity?: number;
   created_at: string;
 }
 

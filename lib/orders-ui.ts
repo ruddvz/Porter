@@ -14,6 +14,8 @@ export function orderStatusBadge(status: OrderStatus): { label: string; variant:
       return { label: "Pending", variant: "unpaid" };
     case "confirmed":
       return { label: "Confirmed", variant: "dispatched" };
+    case "preparing":
+      return { label: "Preparing", variant: "dispatched" };
     case "paid":
       return { label: "Paid", variant: "paid" };
     case "out_for_delivery":

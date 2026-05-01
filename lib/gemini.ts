@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { FullOrderParse, MessageIntent, ParsedLineItem, Product } from "@/types";
 import { FUZZY_CONFIDENCE_THRESHOLD, fuzzyMatchProducts } from "@/lib/fuzzy";
+import { isProductListedForBot } from "@/lib/product-catalog";
 
 /** Parses a single line / phrase into line items using fuzzy match first, Gemini when confidence is low. */
 export async function parseOrderText(
@@ -81,7 +82,7 @@ async function parseWithGemini(chunk: string, products: Product[]): Promise<Pars
     return [];
   }
   const catalog = products
-    .filter((p) => p.in_stock)
+    .filter((p) => isProductListedForBot(p))
     .map(
       (p) =>
         `- id:${p.id} name:${p.name} aliases:${(p.aliases ?? []).join(",")} price:${p.price} unit:${p.unit}`
@@ -157,7 +158,7 @@ export async function parseFullOrder(
   }
   const zones = deliveryZones.length ? deliveryZones.join(", ") : "(none configured)";
   const catalogNames = products
-    .filter((p) => p.in_stock)
+    .filter((p) => isProductListedForBot(p))
     .map((p) => `${p.name} (${(p.aliases ?? []).filter(Boolean).join(", ")})`)
     .join("; ");
 
