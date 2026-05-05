@@ -33,19 +33,30 @@ export default function OnboardingForm() {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    const { error: insErr } = await supabase.from("sellers").insert({
-      user_id: user.id,
-      store_name: storeName,
-      whatsapp_number: whatsapp,
-      city: city || null,
-      delivery_zones,
-      meta_phone_number_id: metaPhoneId || null,
-      meta_access_token: metaToken || null,
-    });
+    const { data: inserted, error: insErr } = await supabase
+      .from("sellers")
+      .insert({
+        user_id: user.id,
+        store_name: storeName,
+        whatsapp_number: whatsapp,
+        city: city || null,
+        delivery_zones,
+        meta_phone_number_id: metaPhoneId || null,
+        meta_access_token: metaToken || null,
+      })
+      .select("id")
+      .single();
     setLoading(false);
     if (insErr) {
       setError(insErr.message);
       return;
+    }
+    if (inserted?.id) {
+      void fetch("/api/internal/after-seller-created", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seller_id: inserted.id }),
+      });
     }
     router.push("/dashboard");
     router.refresh();

@@ -54,7 +54,6 @@ export async function GET(req: Request) {
       skipped++;
       continue;
     }
-
     const lastNudgeAt = c.last_nudge_at ? new Date(c.last_nudge_at).getTime() : 0;
     if (lastNudgeAt && Date.now() - lastNudgeAt < 24 * 60 * 60 * 1000) {
       skipped++;
@@ -71,6 +70,10 @@ export async function GET(req: Request) {
       continue;
     }
     const s = seller as Seller;
+    if (s.plan !== "growth") {
+      skipped++;
+      continue;
+    }
     if (!s.meta_access_token) {
       console.warn("[cron nudge] seller missing meta_access_token", s.id);
       skipped++;

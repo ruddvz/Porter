@@ -31,6 +31,9 @@ export type ConversationState =
 
 export type BotLanguagePreference = "auto" | "gujarati" | "hindi" | "english";
 
+/** Per-day hours: { "mon": { open: "09:00", close: "21:00" }, ... } */
+export type WorkingHoursMap = Record<string, { open: string; close: string } | null | undefined>;
+
 export interface Seller {
   id: string;
   user_id: string;
@@ -50,6 +53,14 @@ export interface Seller {
   bot_intro_message?: string | null;
   bot_language?: BotLanguagePreference | string | null;
   razorpay_test_mode?: boolean | null;
+  store_description?: string | null;
+  logo_url?: string | null;
+  bot_out_of_stock_message?: string | null;
+  bot_order_confirmation_template?: string | null;
+  working_hours?: WorkingHoursMap | null;
+  upi_id_enc?: string | null;
+  razorpay_key_id_enc?: string | null;
+  razorpay_key_secret_enc?: string | null;
 }
 
 export interface Product {
@@ -93,6 +104,7 @@ export interface Order {
   payment_status: PaymentStatus | null;
   razorpay_payment_link_id: string | null;
   razorpay_payment_link_url: string | null;
+  razorpay_order_id?: string | null;
   notes: string | null;
   created_at: string;
   paid_at: string | null;
@@ -131,6 +143,7 @@ export interface ConversationContext {
   order_total?: number;
   /** Set after order row exists */
   order_id?: string;
+  razorpay_order_id?: string;
 }
 
 export interface ParsedLineItem {
@@ -174,6 +187,16 @@ export interface PlatformEvent {
   target_seller_id: string | null;
   notes: string | null;
   created_at: string;
+}
+
+export interface PlatformSettings {
+  id: number;
+  starter_product_limit: number;
+  starter_orders_per_month: number;
+  starter_analytics_days: number;
+  growth_analytics_days: number;
+  announcement: string | null;
+  updated_at: string;
 }
 
 export interface MetaWebhookPayload {

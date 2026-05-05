@@ -1,7 +1,8 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import type { BotLanguagePreference, Seller } from "@/types";
+import type { BotLanguagePreference, Seller, WorkingHoursMap } from "@/types";
+import { checkGate } from "@/lib/plan-gates";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -11,10 +12,18 @@ import { Table } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
 import { useMemo, useState } from "react";
 
-type Tab = "store" | "payments" | "bot" | "subscription" | "danger";
+type Tab = "store" | "delivery" | "payments" | "bot" | "hours" | "meta" | "subscription" | "danger";
+
+const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 const defaultIntro = (name: string) =>
   `Hi! 👋 Welcome to ${name} on Porter. Send me your grocery list and I'll confirm prices, delivery area, and payment.`;
+
+function emptyHours(): WorkingHoursMap {
+  const m: WorkingHoursMap = {};
+  for (const d of DAYS) m[d] = { open: "09:00", close: "21:00" };
+  return m;
+}
 
 export default function SettingsClient({ seller }: { seller: Seller }) {
   const supabase = createSupabaseBrowserClient();
@@ -23,7 +32,10 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
   const [busy, setBusy] = useState(false);
 
   const [storeName, setStoreName] = useState(seller.store_name);
+  const [storeDesc, setStoreDesc] = useState(seller.store_description ?? "");
+  const [logoUrl, setLogoUrl] = useState(seller.logo_url ?? "");
   const [city, setCity] = useState(seller.city ?? "");
+
   const [zoneInput, setZoneInput] = useState("");
   const [zones, setZones] = useState<string[]>(seller.delivery_zones ?? []);
 
@@ -35,15 +47,39 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
   const [codEnabled, setCodEnabled] = useState(seller.cod_enabled);
   const [testMode, setTestMode] = useState(!!seller.razorpay_test_mode);
 
-  const [botIntro, setBotIntro] = useState(seller.bot_intro_message?.trim() || defaultIntro(seller.store_name));
+  const [botIntro, setBotIntro] = useState(
+    seller.plan === "growth" ? seller.bot_intro_message?.trim() || defaultIntro(seller.store_name) : defaultIntro(seller.store_name)
+  );
+  const [botOos, setBotOos] = useState(seller.bot_out_of_stock_message ?? "Sorry, that item is out of stock right now.");
+  const [botConfirmTpl, setBotConfirmTpl] = useState(
+    seller.bot_order_confirmation_template ?? "✅ Order {{id}}\n{{summary}}\n💰 ₹{{total}}\n— {{store}}"
+  );
   const [botLang, setBotLang] = useState<BotLanguagePreference>((seller.bot_language as BotLanguagePreference) || "auto");
+
+  const [hours, setHours] = useState<WorkingHoursMap>(() => {
+    const h = seller.working_hours;
+    if (h && typeof h === "object") return { ...emptyHours(), ...h };
+    return emptyHours();
+  });
+
+  const [metaPhoneId, setMetaPhoneId] = useState(seller.meta_phone_number_id ?? "");
+  const [metaToken, setMetaToken] = useState("");
 
   const [deactivateOpen, setDeactivateOpen] = useState(false);
 
   function addZone() {
-    const z = zoneInput.split(",").map((s) => s.trim()).filter(Boolean);
+    const z = zoneInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (!z.length) return;
-    setZones((prev) => Array.from(new Set([...prev, ...z])));
+    const next = Array.from(new Set([...zones, ...z]));
+    const gate = checkGate(seller, "delivery_zones", { zoneCount: next.length });
+    if (!gate.ok) {
+      toast(gate.reason, "error");
+      return;
+    }
+    setZones(next);
     setZoneInput("");
   }
 
@@ -53,8 +89,9 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
       .from("sellers")
       .update({
         store_name: storeName,
+        store_description: storeDesc || null,
+        logo_url: logoUrl || null,
         city: city || null,
-        delivery_zones: zones,
       })
       .eq("id", seller.id);
     setBusy(false);
@@ -62,36 +99,89 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
     else toast("Store saved", "success");
   }
 
+  async function saveDelivery() {
+    const gate = checkGate(seller, "delivery_zones", { zoneCount: zones.length });
+    if (!gate.ok) {
+      toast(gate.reason, "error");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from("sellers").update({ delivery_zones: zones }).eq("id", seller.id);
+    setBusy(false);
+    if (error) toast(error.message, "error");
+    else toast("Delivery zones saved", "success");
+  }
+
   async function savePayments() {
     setBusy(true);
     const payload: Record<string, unknown> = {
-      upi_id: upi || null,
       cod_enabled: codEnabled,
       razorpay_test_mode: testMode,
     };
     if (rzpId.trim()) payload.razorpay_key_id = rzpId.trim();
     if (rzpSecret.trim()) payload.razorpay_key_secret = rzpSecret.trim();
+    if (upi.trim()) payload.upi_id = upi.trim();
+    else payload.upi_id = null;
+
     const { error } = await supabase.from("sellers").update(payload).eq("id", seller.id);
     setBusy(false);
     if (error) toast(error.message, "error");
     else {
       toast("Payments saved", "success");
       setRzpSecret("");
+      if (upi.trim() || rzpId.trim() || rzpSecret.trim()) {
+        const enc = await fetch("/api/seller/encrypt-payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            upi: upi.trim() || null,
+            razorpay_key_id: rzpId.trim() || null,
+            razorpay_key_secret: rzpSecret.trim() || null,
+          }),
+        });
+        if (enc.ok) {
+          const j = (await enc.json()) as { ok?: boolean };
+          if (j.ok) toast("Sensitive fields encrypted at rest.", "success");
+        }
+      }
     }
   }
 
   async function saveBot() {
     setBusy(true);
-    const { error } = await supabase
-      .from("sellers")
-      .update({
-        bot_intro_message: botIntro || null,
-        bot_language: botLang,
-      })
-      .eq("id", seller.id);
+    const payload: Record<string, unknown> = {
+      bot_out_of_stock_message: botOos || null,
+      bot_order_confirmation_template: botConfirmTpl || null,
+      bot_language: botLang,
+    };
+    if (seller.plan === "growth") payload.bot_intro_message = botIntro || null;
+    const { error } = await supabase.from("sellers").update(payload).eq("id", seller.id);
     setBusy(false);
     if (error) toast(error.message, "error");
     else toast("Bot settings saved", "success");
+  }
+
+  async function saveHours() {
+    setBusy(true);
+    const { error } = await supabase.from("sellers").update({ working_hours: hours }).eq("id", seller.id);
+    setBusy(false);
+    if (error) toast(error.message, "error");
+    else toast("Hours saved", "success");
+  }
+
+  async function saveMeta() {
+    setBusy(true);
+    const payload: Record<string, unknown> = {
+      meta_phone_number_id: metaPhoneId.trim() || null,
+    };
+    if (metaToken.trim()) payload.meta_access_token = metaToken.trim();
+    const { error } = await supabase.from("sellers").update(payload).eq("id", seller.id);
+    setBusy(false);
+    if (error) toast(error.message, "error");
+    else {
+      toast("WhatsApp API settings saved", "success");
+      setMetaToken("");
+    }
   }
 
   async function deactivate() {
@@ -106,9 +196,12 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
     () =>
       [
         { id: "store" as const, label: "Store" },
+        { id: "delivery" as const, label: "Delivery" },
         { id: "payments" as const, label: "Payments" },
         { id: "bot" as const, label: "Bot" },
-        { id: "subscription" as const, label: "Subscription" },
+        { id: "hours" as const, label: "Hours" },
+        { id: "meta" as const, label: "WhatsApp API" },
+        { id: "subscription" as const, label: "Plan" },
         { id: "danger" as const, label: "Danger" },
       ] as const,
     [],
@@ -134,7 +227,24 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
       {tab === "store" && (
         <Card padding="lg" className="space-y-4">
           <Input.Text id="st-name" label="Store name" value={storeName} onChange={(e) => setStoreName(e.target.value)} />
+          <Input.Textarea id="st-desc" label="Description" rows={3} value={storeDesc} onChange={(e) => setStoreDesc(e.target.value)} />
+          <Input.Text id="st-logo" label="Logo URL" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…" />
           <Input.Text id="st-city" label="City" value={city} onChange={(e) => setCity(e.target.value)} />
+          <Input.Text
+            id="st-wa"
+            label="WhatsApp number"
+            value={seller.whatsapp_number}
+            disabled
+            hint="Contact support to change your connected WhatsApp number."
+          />
+          <Button type="button" loading={busy} onClick={() => void saveStore()}>
+            Save
+          </Button>
+        </Card>
+      )}
+
+      {tab === "delivery" && (
+        <Card padding="lg" className="space-y-4">
           <div>
             <Input.Text
               id="st-zones"
@@ -163,15 +273,9 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
               ))}
             </div>
           </div>
-          <Input.Text
-            id="st-wa"
-            label="WhatsApp number"
-            value={seller.whatsapp_number}
-            disabled
-            hint="Contact support to change your connected WhatsApp number."
-          />
-          <Button type="button" loading={busy} onClick={() => void saveStore()}>
-            Save
+          <p className="text-xs text-porter-text-muted">Starter: one zone. Growth: unlimited.</p>
+          <Button type="button" loading={busy} onClick={() => void saveDelivery()}>
+            Save zones
           </Button>
         </Card>
       )}
@@ -187,11 +291,7 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
               onChange={(e) => setRzpId(e.target.value)}
               placeholder="Leave blank to keep existing"
             />
-            <button
-              type="button"
-              className="absolute right-2 top-9 text-xs text-porter-green-400"
-              onClick={() => setShowRzpId((v) => !v)}
-            >
+            <button type="button" className="absolute right-2 top-9 text-xs text-porter-green-400" onClick={() => setShowRzpId((v) => !v)}>
               {showRzpId ? "Hide" : "Show"}
             </button>
           </div>
@@ -204,11 +304,7 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
               onChange={(e) => setRzpSecret(e.target.value)}
               placeholder="Leave blank to keep existing"
             />
-            <button
-              type="button"
-              className="absolute right-2 top-9 text-xs text-porter-green-400"
-              onClick={() => setShowRzpSecret((v) => !v)}
-            >
+            <button type="button" className="absolute right-2 top-9 text-xs text-porter-green-400" onClick={() => setShowRzpSecret((v) => !v)}>
               {showRzpSecret ? "Hide" : "Show"}
             </button>
           </div>
@@ -221,7 +317,9 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
             <span className="text-sm font-semibold text-porter-text-secondary">Razorpay test mode</span>
             <input type="checkbox" checked={testMode} onChange={(e) => setTestMode(e.target.checked)} className="h-6 w-11 accent-porter-green-500" />
           </label>
-          <p className="text-xs text-porter-text-muted">Test mode is stored for your account; payment link behaviour depends on your Razorpay keys.</p>
+          <p className="text-xs text-porter-text-muted">
+            Set PORTER_CREDENTIAL_SECRET on the server, then save — UPI and Razorpay keys can be encrypted at rest (plaintext columns cleared).
+          </p>
           <Button type="button" loading={busy} onClick={() => void savePayments()}>
             Save
           </Button>
@@ -230,21 +328,72 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
 
       {tab === "bot" && (
         <Card padding="lg" className="space-y-4">
-          <Input.Textarea id="bot-intro" label="Bot intro message" value={botIntro} onChange={(e) => setBotIntro(e.target.value)} rows={6} />
+          {seller.plan === "growth" ? (
+            <Input.Textarea id="bot-intro" label="Custom intro (Growth)" value={botIntro} onChange={(e) => setBotIntro(e.target.value)} rows={6} />
+          ) : (
+            <p className="text-sm text-porter-text-secondary">Custom greeting is available on the Growth plan. Default intro is used for Starter.</p>
+          )}
+          <Input.Textarea id="bot-oos" label="Out of stock message" value={botOos} onChange={(e) => setBotOos(e.target.value)} rows={2} />
+          <Input.Textarea
+            id="bot-tpl"
+            label="Order confirmation template"
+            hint="Placeholders: {{summary}}, {{total}}, {{store}}, {{id}}"
+            value={botConfirmTpl}
+            onChange={(e) => setBotConfirmTpl(e.target.value)}
+            rows={5}
+          />
           <Input.Select id="bot-lang" label="Bot language preference" value={botLang} onChange={(e) => setBotLang(e.target.value as BotLanguagePreference)}>
             <option value="auto">Auto-detect</option>
             <option value="gujarati">Gujarati-first</option>
             <option value="hindi">Hindi-first</option>
             <option value="english">English-first</option>
           </Input.Select>
-          <div>
-            <p className="text-label text-porter-text-muted">Preview</p>
-            <div className="mt-2 space-y-2 rounded-xl border border-porter-bg-border bg-porter-bg-raised p-4 text-sm text-porter-text-secondary">
-              <div className="max-w-[85%] rounded-lg bg-porter-bg-surface px-3 py-2 text-porter-text-primary">{botIntro.slice(0, 280)}{botIntro.length > 280 ? "…" : ""}</div>
-              <div className="ml-auto max-w-[85%] rounded-lg bg-porter-green-500/15 px-3 py-2 text-porter-text-primary">5kg bataka, 2L tael</div>
-            </div>
-          </div>
           <Button type="button" loading={busy} onClick={() => void saveBot()}>
+            Save
+          </Button>
+        </Card>
+      )}
+
+      {tab === "hours" && (
+        <Card padding="lg" className="space-y-4">
+          <p className="text-sm text-porter-text-secondary">Shown to customers in welcome copy. Times are 24h (local).</p>
+          <div className="space-y-3">
+            {DAYS.map((d) => (
+              <div key={d} className="grid grid-cols-3 gap-2 items-end">
+                <span className="text-label capitalize text-porter-text-muted">{d}</span>
+                <Input.Text
+                  id={`h-${d}-o`}
+                  label="Open"
+                  value={hours[d]?.open ?? "09:00"}
+                  onChange={(e) => setHours((h) => ({ ...h, [d]: { open: e.target.value, close: h[d]?.close ?? "21:00" } }))}
+                />
+                <Input.Text
+                  id={`h-${d}-c`}
+                  label="Close"
+                  value={hours[d]?.close ?? "21:00"}
+                  onChange={(e) => setHours((h) => ({ ...h, [d]: { open: h[d]?.open ?? "09:00", close: e.target.value } }))}
+                />
+              </div>
+            ))}
+          </div>
+          <Button type="button" loading={busy} onClick={() => void saveHours()}>
+            Save hours
+          </Button>
+        </Card>
+      )}
+
+      {tab === "meta" && (
+        <Card padding="lg" className="space-y-4">
+          <Input.Text id="meta-phone" label="Meta Phone Number ID" value={metaPhoneId} onChange={(e) => setMetaPhoneId(e.target.value)} />
+          <Input.Text
+            id="meta-token"
+            label="Meta access token"
+            type="password"
+            value={metaToken}
+            onChange={(e) => setMetaToken(e.target.value)}
+            placeholder="Leave blank to keep existing"
+          />
+          <Button type="button" loading={busy} onClick={() => void saveMeta()}>
             Save
           </Button>
         </Card>
@@ -264,11 +413,12 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
               { key: "g", header: "Growth", cell: (r) => r.g },
             ]}
             rows={[
-              { f: "WhatsApp numbers", s: "1", g: "1" },
-              { f: "Orders / month", s: "500", g: "Unlimited" },
-              { f: "Live dashboard", s: "Yes", g: "Yes" },
-              { f: "CSV export", s: "—", g: "Yes" },
-              { f: "Abandoned nudges", s: "—", g: "Yes" },
+              { f: "Products", s: "50", g: "Unlimited" },
+              { f: "Orders / month", s: "200", g: "Unlimited" },
+              { f: "Analytics history", s: "30 days", g: "12 months" },
+              { f: "Push + nudge cron", s: "—", g: "Yes" },
+              { f: "Custom bot greeting", s: "—", g: "Yes" },
+              { f: "Delivery zones", s: "1", g: "Unlimited" },
             ]}
             getRowKey={(r) => r.f}
           />
@@ -277,9 +427,6 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
               Upgrade to Growth
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => toast("Billing portal coming soon", "info")}>
-            Manage billing
-          </Button>
         </Card>
       )}
 
@@ -289,10 +436,6 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
           <Button type="button" variant="danger" onClick={() => setDeactivateOpen(true)}>
             Deactivate store
           </Button>
-          <Card padding="md" variant="raised">
-            <p className="text-title text-porter-text-primary">Delete all data</p>
-            <p className="mt-2 text-body text-porter-text-secondary">Contact support to permanently delete store data.</p>
-          </Card>
         </Card>
       )}
 

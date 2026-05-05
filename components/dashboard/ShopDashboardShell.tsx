@@ -2,15 +2,19 @@
 
 import { Sidebar, type SidebarNavItem } from "@/components/ui/Sidebar";
 import TopBar, { type TopBarRecentOrder } from "@/components/dashboard/TopBar";
+import InstallPrompt from "@/components/dashboard/InstallPrompt";
+import PushPrompt from "@/components/dashboard/PushPrompt";
+import { registerSellerServiceWorker } from "@/lib/registerServiceWorker";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
-import { LayoutDashboard, Package, ScrollText, Settings } from "lucide-react";
+import { LayoutDashboard, Package, ScrollText, Settings, BarChart3 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function pageTitle(pathname: string): string {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard?")) return "Live Orders";
   if (pathname.startsWith("/dashboard/orders")) return "Order History";
+  if (pathname.startsWith("/dashboard/analytics")) return "Analytics";
   if (pathname.startsWith("/dashboard/inventory")) return "Inventory";
   if (pathname.startsWith("/dashboard/settings")) return "Settings";
   return "Dashboard";
@@ -37,6 +41,7 @@ export default function ShopDashboardShell({
     () => [
       { href: "/dashboard", label: "Live Orders", icon: LayoutDashboard, badge: pendingOrderCount > 0 ? pendingOrderCount : undefined },
       { href: "/dashboard/orders", label: "History", icon: ScrollText },
+      { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/inventory", label: "Inventory", icon: Package },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
@@ -51,6 +56,10 @@ export default function ShopDashboardShell({
   }
 
   const title = pageTitle(pathname);
+
+  useEffect(() => {
+    registerSellerServiceWorker();
+  }, []);
 
   return (
     <>
@@ -77,7 +86,13 @@ export default function ShopDashboardShell({
           onOpenNav={() => setMobileNav(true)}
           impersonating={impersonating}
         />
-        <main className="min-h-[calc(100vh-3.5rem)] pb-24">{children}</main>
+        <main className="min-h-[calc(100vh-3.5rem)] space-y-4 pb-24">
+          <div className="px-3 pt-3 md:px-6 md:pt-4">
+            <PushPrompt seller={seller} />
+          </div>
+          {children}
+        </main>
+        <InstallPrompt />
       </div>
     </>
   );

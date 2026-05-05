@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
 import { OrderCard as UiOrderCard } from "@/components/ui/OrderCard";
 import { StatCard } from "@/components/ui/StatCard";
 import { useRealtimeOrders } from "@/lib/hooks/useRealtimeOrders";
@@ -19,8 +20,18 @@ import {
   timeAgoLabel,
 } from "@/lib/orders-ui";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import type { Order, Seller } from "@/types";
-import { Check, Package, Truck, X } from "lucide-react";
+import type { Order, OrderStatus, Seller } from "@/types";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { Check, MessageCircle, Package, Truck, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 
@@ -30,7 +41,49 @@ function startOfToday() {
   return d;
 }
 
-/** Live kanban board with realtime order updates and today stats. */
+function defaultFromIso() {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
+
+const COLUMN_ORDER: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "paid",
+  "out_for_delivery",
+  "delivered",
+];
+
+function columnLabel(s: OrderStatus): string {
+  switch (s) {
+    case "pending":
+      return "Pending";
+    case "confirmed":
+      return "Confirmed";
+    case "preparing":
+      return "Preparing";
+    case "paid":
+      return "Paid";
+    case "out_for_delivery":
+      return "Out for delivery";
+    case "delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return s;
+  }
+}
+
+function waLink(phone: string, text: string) {
+  const digits = phone.replace(/\D/g, "");
+  const n = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+
+/** Live kanban: 6 workflow columns + cancelled, drag-and-drop, realtime, gated sound. */
 export default function LiveOrdersBoard({
   seller,
   initialOrders,
@@ -48,6 +101,10 @@ export default function LiveOrdersBoard({
   const [panel, setPanel] = useState<OrderWithItems | null>(null);
   const seenIds = useRef<Set<string>>(new Set(initialOrders.map((o) => o.id)));
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const [from, setFrom] = useState(defaultFromIso);
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
   useEffect(() => {
     const el = boardRef.current;
@@ -92,18 +149,33 @@ export default function LiveOrdersBoard({
     }
   }, [typed]);
 
+  const inRange = useMemo(() => {
+    return typed.filter((o) => {
+      if (from) {
+        if (new Date(o.created_at) < new Date(from)) return false;
+      }
+      if (to) {
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        if (new Date(o.created_at) > end) return false;
+      }
+      return true;
+    });
+  }, [typed, from, to]);
+
   const board = useMemo(() => {
-    const cancelled = typed.filter((o) => o.status === "cancelled");
-    const active = typed.filter((o) => o.status !== "cancelled");
+    const cancelled = inRange.filter((o) => o.status === "cancelled");
+    const active = inRange.filter((o) => o.status !== "cancelled");
     return {
       pending: active.filter((o) => o.status === "pending"),
       confirmed: active.filter((o) => o.status === "confirmed"),
-      preparing: active.filter((o) => o.status === "preparing" || o.status === "paid"),
-      out: active.filter((o) => o.status === "out_for_delivery"),
+      preparing: active.filter((o) => o.status === "preparing"),
+      paid: active.filter((o) => o.status === "paid"),
+      out_for_delivery: active.filter((o) => o.status === "out_for_delivery"),
       delivered: active.filter((o) => o.status === "delivered"),
       cancelled,
     };
-  }, [typed]);
+  }, [inRange]);
 
   const stats = useMemo(() => {
     const t0 = startOfToday();
@@ -112,9 +184,9 @@ export default function LiveOrdersBoard({
       .filter((o) => o.payment_status === "paid" || o.payment_status === "cod_collected")
       .reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
     const paidCount = today.filter((o) => o.payment_status === "paid" || o.payment_status === "cod_collected").length;
-    const pendingNow = board.pending.length;
+    const pendingNow = typed.filter((o) => o.status === "pending").length;
     return { total: today.length, revenue, paidCount, pendingNow };
-  }, [typed, board.pending.length]);
+  }, [typed]);
 
   const updateOrder = useCallback(
     (o: Order) => {
@@ -136,6 +208,23 @@ export default function LiveOrdersBoard({
     [supabase, updateOrder, toast],
   );
 
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const overId = event.over?.id as string | undefined;
+      const activeId = event.active.id as string;
+      if (!overId || !activeId) return;
+      const order = typed.find((o) => o.id === activeId);
+      if (!order) return;
+      if (overId === "cancelled" || COLUMN_ORDER.includes(overId as OrderStatus)) {
+        const next = overId as OrderStatus;
+        const extra: Partial<Order> = {};
+        if (next === "delivered") extra.delivered_at = new Date().toISOString();
+        void patchOrder(order, { status: next, ...extra });
+      }
+    },
+    [typed, patchOrder],
+  );
+
   return (
     <>
       <div className="px-3 py-4 md:px-6 md:py-6">
@@ -150,69 +239,52 @@ export default function LiveOrdersBoard({
           <StatCard label="Paid orders" value={stats.paidCount} valueTone="success" />
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-6 xl:gap-3" ref={boardRef}>
-          <KanbanColumn title="Pending" count={board.pending.length}>
-            {board.pending.length === 0 ? (
-              <EmptyState title="No pending orders" description="New WhatsApp orders appear here in real time." />
-            ) : (
-              board.pending.map((o) => (
-                <BoardOrderCard
-                  key={o.id}
-                  order={o}
-                  nowMs={nowMs}
-                  isNew={newIds.has(o.id)}
-                  onOpen={() => setPanel(o)}
-                  onPatch={(u) => void patchOrder(o, u)}
-                />
-              ))
-            )}
-          </KanbanColumn>
-          <KanbanColumn title="Confirmed" count={board.confirmed.length}>
-            {board.confirmed.length === 0 ? (
-              <EmptyState title="No confirmed orders" description="Confirm pending orders to move them here." />
-            ) : (
-              board.confirmed.map((o) => (
-                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
-              ))
-            )}
-          </KanbanColumn>
-          <KanbanColumn title="Preparing" count={board.preparing.length}>
-            {board.preparing.length === 0 ? (
-              <EmptyState title="Nothing in prep" description="Paid orders and kitchen prep show here." />
-            ) : (
-              board.preparing.map((o) => (
-                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
-              ))
-            )}
-          </KanbanColumn>
-          <KanbanColumn title="Out for delivery" count={board.out.length}>
-            {board.out.length === 0 ? (
-              <EmptyState title="Nothing out" description="Dispatch when the rider leaves." />
-            ) : (
-              board.out.map((o) => (
-                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
-              ))
-            )}
-          </KanbanColumn>
-          <KanbanColumn title="Delivered" count={board.delivered.length}>
-            {board.delivered.length === 0 ? (
-              <EmptyState title="No deliveries yet" description="Completed orders land here." />
-            ) : (
-              board.delivered.map((o) => (
-                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} dimmed onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
-              ))
-            )}
-          </KanbanColumn>
-          <KanbanColumn title="Cancelled" count={board.cancelled.length}>
-            {board.cancelled.length === 0 ? (
-              <EmptyState title="No cancelled" description="Cancelled orders are kept for records." />
-            ) : (
-              board.cancelled.map((o) => (
-                <BoardOrderCard key={o.id} order={o} nowMs={nowMs} dimmed onOpen={() => setPanel(o)} onPatch={(u) => void patchOrder(o, u)} />
-              ))
-            )}
-          </KanbanColumn>
-        </div>
+        <Card padding="md" className="mt-4 space-y-3">
+          <p className="text-label text-porter-text-muted">Kanban date range</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input.Text id="kb-from" type="date" label="From" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input.Text id="kb-to" type="date" label="To" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+        </Card>
+
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-7 xl:gap-2" ref={boardRef}>
+            {COLUMN_ORDER.map((col) => (
+              <DroppableColumn key={col} id={col} title={columnLabel(col)} count={board[col].length}>
+                {board[col].length === 0 ? (
+                  <EmptyState title={`No ${columnLabel(col)}`} description="Drag cards here or wait for new orders." />
+                ) : (
+                  board[col].map((o) => (
+                    <DraggableBoardCard
+                      key={o.id}
+                      order={o}
+                      nowMs={nowMs}
+                      isNew={newIds.has(o.id)}
+                      onOpen={() => setPanel(o)}
+                      onPatch={(u) => void patchOrder(o, u)}
+                    />
+                  ))
+                )}
+              </DroppableColumn>
+            ))}
+            <DroppableColumn id="cancelled" title="Cancelled" count={board.cancelled.length}>
+              {board.cancelled.length === 0 ? (
+                <EmptyState title="No cancelled" description="Cancelled orders appear here." />
+              ) : (
+                board.cancelled.map((o) => (
+                  <DraggableBoardCard
+                    key={o.id}
+                    order={o}
+                    nowMs={nowMs}
+                    dimmed
+                    onOpen={() => setPanel(o)}
+                    onPatch={(u) => void patchOrder(o, u)}
+                  />
+                ))
+              )}
+            </DroppableColumn>
+          </div>
+        </DndContext>
       </div>
 
       {panel && (
@@ -229,19 +301,38 @@ export default function LiveOrdersBoard({
   );
 }
 
-function KanbanColumn({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function DroppableColumn({
+  id,
+  title,
+  count,
+  children,
+}: {
+  id: string;
+  title: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <Card padding="sm" className="flex max-h-[calc(100vh-14rem)] min-h-[200px] flex-col lg:max-h-[calc(100vh-12rem)]">
-      <div className="flex shrink-0 items-center justify-between border-b border-porter-bg-border px-2 py-2">
-        <span className="text-label text-porter-text-muted">{title}</span>
-        <Badge kind="status" variant="paid" label={String(count)} size="sm" className="!bg-porter-bg-raised !text-porter-text-secondary !ring-porter-bg-border" />
-      </div>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-1 py-3">{children}</div>
-    </Card>
+    <div ref={setNodeRef} className={isOver ? "ring-2 ring-porter-green-500/40 ring-offset-2 ring-offset-porter-bg-base rounded-xl" : ""}>
+      <Card padding="sm" className="flex max-h-[calc(100vh-18rem)] min-h-[200px] flex-col xl:max-h-[calc(100vh-14rem)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-porter-bg-border px-2 py-2">
+          <span className="text-label text-porter-text-muted">{title}</span>
+          <Badge
+            kind="status"
+            variant="paid"
+            label={String(count)}
+            size="sm"
+            className="!bg-porter-bg-raised !text-porter-text-secondary !ring-porter-bg-border"
+          />
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-1 py-3">{children}</div>
+      </Card>
+    </div>
   );
 }
 
-function BoardOrderCard({
+function DraggableBoardCard({
   order,
   nowMs,
   onOpen,
@@ -256,19 +347,41 @@ function BoardOrderCard({
   dimmed?: boolean;
   isNew?: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.55 : undefined,
+  };
+
   const pay = paymentBadge(order);
   const status = orderStatusBadge(order.status);
   const urgency = pendingTimeUrgency(order.status, order.created_at, nowMs);
+  const prefill = `Hi${order.customer_name ? ` ${order.customer_name}` : ""}, regarding order #${order.id.slice(0, 8)} — `;
 
   const actions = (
     <>
+      <Button
+        size="sm"
+        type="button"
+        variant="secondary"
+        onClick={() => window.open(waLink(order.customer_phone, prefill), "_blank", "noopener,noreferrer")}
+      >
+        <MessageCircle className="h-4 w-4" />
+        WhatsApp
+      </Button>
       {order.status === "pending" && (
         <>
           <Button size="sm" type="button" onClick={() => onPatch({ status: "confirmed" })}>
             <Check className="h-4 w-4" />
             Confirm
           </Button>
-          <Button size="sm" type="button" variant="ghost" className="text-porter-status-cancelled hover:text-porter-status-cancelled" onClick={() => onPatch({ status: "cancelled" })}>
+          <Button
+            size="sm"
+            type="button"
+            variant="ghost"
+            className="text-porter-status-cancelled hover:text-porter-status-cancelled"
+            onClick={() => onPatch({ status: "cancelled" })}
+          >
             <X className="h-4 w-4" />
             Cancel
           </Button>
@@ -310,20 +423,22 @@ function BoardOrderCard({
   );
 
   return (
-    <UiOrderCard
-      customerName={order.customer_name || "Customer"}
-      phone={order.customer_phone}
-      itemsSummary={itemSummaryLine(order.order_items)}
-      totalFormatted={formatCurrencyInr(order.total_amount)}
-      statusLabel={status.label}
-      statusVariant={status.variant}
-      payment={{ label: pay.label, statusVariant: pay.statusVariant, methodLabel: pay.methodLabel }}
-      timeLabel={timeAgoLabel(order.created_at, nowMs)}
-      timeUrgency={urgency}
-      actions={order.status === "delivered" ? undefined : actions}
-      dimmed={dimmed}
-      isNew={isNew}
-      onCardClick={onOpen}
-    />
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      <UiOrderCard
+        customerName={order.customer_name || "Customer"}
+        phone={order.customer_phone}
+        itemsSummary={itemSummaryLine(order.order_items)}
+        totalFormatted={formatCurrencyInr(order.total_amount)}
+        statusLabel={status.label}
+        statusVariant={status.variant}
+        payment={{ label: pay.label, statusVariant: pay.statusVariant, methodLabel: pay.methodLabel }}
+        timeLabel={timeAgoLabel(order.created_at, nowMs)}
+        timeUrgency={urgency}
+        actions={order.status === "delivered" || order.status === "cancelled" ? undefined : actions}
+        dimmed={dimmed}
+        isNew={isNew}
+        onCardClick={onOpen}
+      />
+    </div>
   );
 }
