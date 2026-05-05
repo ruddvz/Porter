@@ -1,12 +1,28 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { FullOrderParse, MessageIntent, ParsedLineItem, Product } from "@/types";
+import type { BotLanguagePreference, FullOrderParse, MessageIntent, ParsedLineItem, Product } from "@/types";
 import { FUZZY_CONFIDENCE_THRESHOLD, fuzzyMatchProducts } from "@/lib/fuzzy";
 import { isProductListedForBot } from "@/lib/product-catalog";
+import { normalizeBotLanguagePref } from "@/lib/bot-locale";
+
+function geminiLanguageInstruction(pref: BotLanguagePreference): string {
+  const p = normalizeBotLanguagePref(pref);
+  if (p === "gujarati") {
+    return "The seller prefers Gujarati: interpret requests accordingly and keep reasoning aligned with Gujarati customers.";
+  }
+  if (p === "hindi") {
+    return "The seller prefers Hindi: interpret requests accordingly and keep reasoning aligned with Hindi customers.";
+  }
+  if (p === "english") {
+    return "The seller prefers English: prefer English product understanding where ambiguous.";
+  }
+  return "Auto language: customers may mix Gujarati, Hindi, and English — handle all equally.";
+}
 
 /** Parses a single line / phrase into line items using fuzzy match first, Gemini when confidence is low. */
 export async function parseOrderText(
   text: string,
-  products: Product[]
+  products: Product[],
+  opts?: { botLanguage?: BotLanguagePreference }
 ): Promise<ParsedLineItem[]> {
   const lines = text
     .split(/[\n,]+/)
@@ -37,7 +53,7 @@ export async function parseOrderText(
 
   if (unmatched.length === 0) return mergeDuplicateProducts(items);
 
-  const geminiItems = await parseWithGemini(unmatched.join("\n"), products);
+  const geminiItems = await parseWithGemini(unmatched.join("\n"), products, opts?.botLanguage);
   return mergeDuplicateProducts([...items, ...geminiItems]);
 }
 
@@ -75,7 +91,7 @@ function mergeDuplicateProducts(items: ParsedLineItem[]): ParsedLineItem[] {
 }
 
 /** Calls Gemini Flash with trilingual instructions to map free text to catalog products. */
-async function parseWithGemini(chunk: string, products: Product[]): Promise<ParsedLineItem[]> {
+async function parseWithGemini(chunk: string, products: Product[], botLanguage?: BotLanguagePreference): Promise<ParsedLineItem[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     console.error("[gemini] GEMINI_API_KEY missing");
@@ -92,7 +108,10 @@ async function parseWithGemini(chunk: string, products: Product[]): Promise<Pars
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  const prompt = `You are an order parser for an Indian grocery shop. Input may be Gujarati, Hindi, or English.
+  const langBlock = geminiLanguageInstruction(botLanguage ?? "auto");
+  const prompt = `You are an order parser for an Indian grocery shop.
+${langBlock}
+Input may be Gujarati, Hindi, or English (often mixed).
 Match each requested item to ONE product from the catalog by id. Output ONLY valid JSON array, no markdown:
 [{"product_id":"uuid","product_name":"string","quantity":number,"unit":"string"}]
 Use catalog unit if unsure. quantity must be positive number.
@@ -149,7 +168,8 @@ function extractJsonObject(raw: string): string | null {
 export async function parseFullOrder(
   text: string,
   products: Product[],
-  deliveryZones: string[]
+  deliveryZones: string[],
+  opts?: { botLanguage?: BotLanguagePreference }
 ): Promise<FullOrderParse | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -165,7 +185,9 @@ export async function parseFullOrder(
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+  const langBlock = geminiLanguageInstruction(opts?.botLanguage ?? "auto");
   const prompt = `You parse WhatsApp messages for a grocery store in Gujarat, India.
+${langBlock}
 Messages may be Gujarati, Hindi, English, or mixed.
 Extract ALL of the following if present:
 - items: grocery items with quantities (e.g. '5 kilo bataka' = {name:'Potato', quantity:5, unit:'kg'})
@@ -200,12 +222,14 @@ ${text}`;
 }
 
 /** Lightweight intent routing for short messages. */
-export async function classifyIntent(text: string): Promise<MessageIntent> {
+export async function classifyIntent(text: string, opts?: { botLanguage?: BotLanguagePreference }): Promise<MessageIntent> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return "order";
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const langBlock = geminiLanguageInstruction(opts?.botLanguage ?? "auto");
   const prompt = `Classify this WhatsApp message from a customer of a grocery store in Gujarat, India.
+${langBlock}
 The message may be Gujarati, Hindi, English, or mixed.
 Return ONLY one of these exact strings (no other text):
 - 'order' — they want to buy or order something

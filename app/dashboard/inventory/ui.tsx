@@ -352,9 +352,37 @@ function ProductModal({
       setUploading(false);
       return;
     }
-    const ext = file.name.split(".").pop() || "jpg";
-    const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: true });
+    let blob: Blob = file;
+    let filenameExt = "jpg";
+    try {
+      const img = await createImageBitmap(file);
+      const maxSide = 800;
+      const w = img.width;
+      const h = img.height;
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      const cw = Math.round(w * scale);
+      const ch = Math.round(h * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx2 = canvas.getContext("2d");
+      if (ctx2) {
+        ctx2.drawImage(img, 0, 0, cw, ch);
+        blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not encode image"))), "image/jpeg", 0.88);
+        });
+        filenameExt = "jpg";
+      }
+      img.close();
+    } catch {
+      blob = file;
+      filenameExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+    }
+    const path = `${user.id}/${crypto.randomUUID()}.${filenameExt}`;
+    const { error } = await supabase.storage.from("product-images").upload(path, blob, {
+      upsert: true,
+      contentType: blob.type || "image/jpeg",
+    });
     setUploading(false);
     if (error) {
       toast(error.message, "error");

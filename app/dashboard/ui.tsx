@@ -127,7 +127,7 @@ export default function LiveOrdersBoard({
         .order("created_at", { ascending: false })
         .limit(200)
         .then(({ data, error }) => {
-          if (!error && data) setOrders(data as Order[]);
+          if (!error && data) setOrders(data as OrderWithItems[]);
         });
     }, 60_000);
     return () => window.clearInterval(t);

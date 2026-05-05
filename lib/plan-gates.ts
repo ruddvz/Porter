@@ -7,7 +7,8 @@ export type PlanGateFeature =
   | "push_notifications"
   | "nudge_cron"
   | "custom_bot_greeting"
-  | "delivery_zones";
+  | "delivery_zones"
+  | "csv_export";
 
 export type PlanGateResult = { ok: true } | { ok: false; reason: string; upgradeTo?: SellerPlan };
 
@@ -63,6 +64,11 @@ export function checkGate(
     if (p === "starter" && z > 1) {
       return { ok: false, reason: "Starter allows one delivery zone. Upgrade for unlimited zones.", upgradeTo: "growth" };
     }
+    return { ok: true };
+  }
+
+  if (feature === "csv_export") {
+    if (p !== "growth") return { ok: false, reason: "CSV export is available on Growth plan.", upgradeTo: "growth" };
     return { ok: true };
   }
 

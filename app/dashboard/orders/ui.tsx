@@ -10,8 +10,9 @@ import { useToast } from "@/components/ui/Toast";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { OrderWithItems } from "@/lib/orders-ui";
 import { formatCurrencyInr, itemSummaryLine, orderStatusBadge, paymentBadge, timeAgoLabel } from "@/lib/orders-ui";
+import { checkGate } from "@/lib/plan-gates";
 import { useSharedNow } from "@/lib/hooks/useSharedNow";
-import type { OrderStatus } from "@/types";
+import type { OrderStatus, SellerPlan } from "@/types";
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -24,10 +25,12 @@ function todayISO() {
 
 export default function OrderHistoryClient({
   sellerId,
+  sellerPlan,
   initialOrders,
   pageSize,
 }: {
   sellerId: string;
+  sellerPlan: SellerPlan;
   initialOrders: OrderWithItems[];
   pageSize: number;
 }) {
@@ -101,6 +104,11 @@ export default function OrderHistoryClient({
   }, [page, pageSize, sellerId, supabase, toast]);
 
   function exportCsv() {
+    const gate = checkGate({ plan: sellerPlan }, "csv_export");
+    if (!gate.ok) {
+      toast(gate.reason, "error");
+      return;
+    }
     const rows = [
       ["id", "customer", "phone", "total", "status", "payment", "created_at"],
       ...filtered.map((o) => [

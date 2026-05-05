@@ -10,7 +10,7 @@ export default async function OrderHistoryPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
-  const { data: seller } = await supabase.from("sellers").select("id").eq("user_id", user.id).maybeSingle();
+  const { data: seller } = await supabase.from("sellers").select("id, plan").eq("user_id", user.id).maybeSingle();
   if (!seller) redirect("/onboarding");
 
   const { data: orders } = await supabase
@@ -20,5 +20,5 @@ export default async function OrderHistoryPage() {
     .order("created_at", { ascending: false })
     .range(0, PAGE_SIZE - 1);
 
-  return <OrderHistoryClient sellerId={seller.id} initialOrders={orders ?? []} pageSize={PAGE_SIZE} />;
+  return <OrderHistoryClient sellerPlan={seller.plan} sellerId={seller.id} initialOrders={orders ?? []} pageSize={PAGE_SIZE} />;
 }

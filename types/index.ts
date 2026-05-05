@@ -114,6 +114,7 @@ export interface Order {
 export interface OrderItem {
   id: string;
   order_id: string;
+  seller_id?: string;
   product_id: string | null;
   product_name: string;
   quantity: number;
@@ -144,6 +145,8 @@ export interface ConversationContext {
   /** Set after order row exists */
   order_id?: string;
   razorpay_order_id?: string;
+  /** When bot_language is auto: first detected customer language for consistent replies */
+  detected_reply_lang?: "gujarati" | "hindi" | "english";
 }
 
 export interface ParsedLineItem {
