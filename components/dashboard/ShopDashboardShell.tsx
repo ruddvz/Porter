@@ -7,7 +7,9 @@ import PushPrompt from "@/components/dashboard/PushPrompt";
 import { registerSellerServiceWorker } from "@/lib/registerServiceWorker";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
+import { cn } from "@/lib/cn";
 import { LayoutDashboard, Package, ScrollText, Settings, BarChart3 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -93,6 +95,41 @@ export default function ShopDashboardShell({
           {children}
         </main>
         <InstallPrompt />
+
+        <nav
+          className="fixed bottom-0 left-0 right-0 z-30 border-t border-porter-bg-border bg-porter-bg-base/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+          aria-label="Primary"
+        >
+          <div className="mx-auto flex max-w-lg justify-around px-1 py-2">
+            {items.map((item) => {
+              const active =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard" || pathname === "/dashboard/"
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex min-h-12 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] font-semibold uppercase tracking-wide transition-colors",
+                    active ? "text-porter-green-400" : "text-porter-text-muted hover:text-porter-text-secondary",
+                  )}
+                >
+                  <span className="relative inline-flex">
+                    <Icon className="h-5 w-5" aria-hidden />
+                    {item.badge != null && item.badge !== 0 && (
+                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-porter-orange-500 px-1 text-[10px] font-bold text-black">
+                        {item.badge}
+                      </span>
+                    )}
+                  </span>
+                  <span className="max-w-[4.5rem] truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </>
   );

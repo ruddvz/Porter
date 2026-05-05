@@ -32,6 +32,7 @@ import {
   t,
   type ReplyLang,
 } from "@/lib/bot-locale";
+import { isSellerWithinWorkingHours } from "@/lib/working-hours";
 
 function geminiLangOpts(seller: Seller) {
   return { botLanguage: normalizeBotLanguagePref(seller.bot_language) as BotLanguagePreference };
@@ -166,6 +167,18 @@ export async function handleIncomingCustomerMessage(
 
   let ctx: ConversationContext = (conversation.context as ConversationContext) ?? {};
   ctx = await persistAutoDetectedLang(supabase, conversation.id, seller, text, ctx);
+
+  if (!isSellerWithinWorkingHours(seller) && conversation.state === "collecting_items") {
+    const lang = replyLangFromCtx(seller, ctx);
+    const custom = seller.off_hours_message?.trim();
+    const msg =
+      custom && custom.length > 0
+        ? custom
+        : t("off_hours_closed", lang, { store: seller.store_name });
+    await sendMessage(phone, msg, seller);
+    await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
+    return;
+  }
 
   const welcomeAlreadySent =
     conversation.state === "collecting_items" &&
@@ -660,6 +673,17 @@ async function finalizeOrderFromContext(
   const area = ctx.area ?? "";
   const address = (ctx.address ?? "").trim();
   const total = ctx.order_total ?? round2(items.reduce((s, i) => s + i.total_price, 0));
+
+  const minOrder = seller.min_order_amount != null ? Number(seller.min_order_amount) : null;
+  if (minOrder != null && Number.isFinite(minOrder) && minOrder > 0 && total < minOrder) {
+    const lang = replyLangFromCtx(seller, ctx);
+    await sendMessage(
+      phone,
+      t("min_order_not_met", lang, { min: String(minOrder), total: String(total) }),
+      seller
+    );
+    return;
+  }
 
   const rzp = getRazorpayKeysForSeller(seller);
   if (paymentMethod === "razorpay" && !rzp) {

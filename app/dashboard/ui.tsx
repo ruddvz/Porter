@@ -47,21 +47,35 @@ function defaultFromIso() {
   return d.toISOString().slice(0, 10);
 }
 
-const COLUMN_ORDER: OrderStatus[] = [
+/** Kanban column ids: workflow statuses plus virtual "awaiting_payment" bucket. */
+type KanbanColumnId = OrderStatus | "awaiting_payment";
+
+const COLUMN_ORDER: KanbanColumnId[] = [
   "pending",
   "confirmed",
+  "awaiting_payment",
   "preparing",
   "paid",
   "out_for_delivery",
   "delivered",
 ];
 
-function columnLabel(s: OrderStatus): string {
+function isAwaitingPayment(o: OrderWithItems): boolean {
+  return (
+    o.status === "pending" &&
+    o.payment_method === "razorpay" &&
+    (o.payment_status === "unpaid" || o.payment_status == null)
+  );
+}
+
+function columnLabel(s: KanbanColumnId): string {
   switch (s) {
     case "pending":
       return "Pending";
     case "confirmed":
       return "Confirmed";
+    case "awaiting_payment":
+      return "Awaiting payment";
     case "preparing":
       return "Preparing";
     case "paid":
@@ -96,13 +110,14 @@ export default function LiveOrdersBoard({
   const supabase = createSupabaseBrowserClient();
   const [soundOn, setSoundOn] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
-  const { orders, setOrders } = useRealtimeOrders(seller.id, initialOrders as Order[], { playSoundOnNewOrder: soundOn });
+  const { orders, setOrders } = useRealtimeOrders(seller.id, initialOrders, { playSoundOnNewOrder: soundOn });
   const typed = orders as OrderWithItems[];
   const [panel, setPanel] = useState<OrderWithItems | null>(null);
   const seenIds = useRef<Set<string>>(new Set(initialOrders.map((o) => o.id)));
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [from, setFrom] = useState(defaultFromIso);
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [boardSearch, setBoardSearch] = useState("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
@@ -163,11 +178,33 @@ export default function LiveOrdersBoard({
     });
   }, [typed, from, to]);
 
+  const searchFiltered = useMemo(() => {
+    const q = boardSearch.trim().toLowerCase();
+    if (!q) return inRange;
+    return inRange.filter((o) => {
+      const idShort = o.id.slice(0, 8).toLowerCase();
+      const phone = o.customer_phone.toLowerCase().replace(/\s/g, "");
+      const name = (o.customer_name ?? "").toLowerCase();
+      const qDigits = q.replace(/\D/g, "");
+      const phoneDigits = o.customer_phone.replace(/\D/g, "");
+      return (
+        idShort.includes(q) ||
+        name.includes(q) ||
+        phone.includes(q) ||
+        (qDigits.length >= 4 && phoneDigits.includes(qDigits))
+      );
+    });
+  }, [inRange, boardSearch]);
+
   const board = useMemo(() => {
-    const cancelled = inRange.filter((o) => o.status === "cancelled");
-    const active = inRange.filter((o) => o.status !== "cancelled");
+    const cancelled = searchFiltered.filter((o) => o.status === "cancelled");
+    const active = searchFiltered.filter((o) => o.status !== "cancelled");
+    const pendingAll = active.filter((o) => o.status === "pending");
+    const awaitingPay = pendingAll.filter(isAwaitingPayment);
+    const pendingRest = pendingAll.filter((o) => !isAwaitingPayment(o));
     return {
-      pending: active.filter((o) => o.status === "pending"),
+      pending: pendingRest,
+      awaiting_payment: awaitingPay,
       confirmed: active.filter((o) => o.status === "confirmed"),
       preparing: active.filter((o) => o.status === "preparing"),
       paid: active.filter((o) => o.status === "paid"),
@@ -175,7 +212,7 @@ export default function LiveOrdersBoard({
       delivered: active.filter((o) => o.status === "delivered"),
       cancelled,
     };
-  }, [inRange]);
+  }, [searchFiltered]);
 
   const stats = useMemo(() => {
     const t0 = startOfToday();
@@ -215,7 +252,17 @@ export default function LiveOrdersBoard({
       if (!overId || !activeId) return;
       const order = typed.find((o) => o.id === activeId);
       if (!order) return;
-      if (overId === "cancelled" || COLUMN_ORDER.includes(overId as OrderStatus)) {
+      if (overId === "cancelled") {
+        void patchOrder(order, { status: "cancelled" });
+        return;
+      }
+      if (overId === "awaiting_payment") {
+        if (order.payment_method === "cod") return;
+        if (order.status !== "pending") return;
+        void patchOrder(order, { payment_method: "razorpay", payment_status: "unpaid" });
+        return;
+      }
+      if (COLUMN_ORDER.includes(overId as KanbanColumnId) && overId !== "awaiting_payment") {
         const next = overId as OrderStatus;
         const extra: Partial<Order> = {};
         if (next === "delivered") extra.delivered_at = new Date().toISOString();
@@ -245,10 +292,18 @@ export default function LiveOrdersBoard({
             <Input.Text id="kb-from" type="date" label="From" value={from} onChange={(e) => setFrom(e.target.value)} />
             <Input.Text id="kb-to" type="date" label="To" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
+          <Input.Text
+            id="kb-search"
+            label="Search board"
+            inputVariant="search"
+            value={boardSearch}
+            onChange={(e) => setBoardSearch(e.target.value)}
+            placeholder="Name, phone, or order #"
+          />
         </Card>
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-7 xl:gap-2" ref={boardRef}>
+          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-8 xl:gap-2" ref={boardRef}>
             {COLUMN_ORDER.map((col) => (
               <DroppableColumn key={col} id={col} title={columnLabel(col)} count={board[col].length}>
                 {board[col].length === 0 ? (
@@ -289,6 +344,7 @@ export default function LiveOrdersBoard({
 
       {panel && (
         <OrderDetailPanel
+          seller={seller}
           order={panel}
           onClose={() => setPanel(null)}
           onSaved={() => {
@@ -307,7 +363,7 @@ function DroppableColumn({
   count,
   children,
 }: {
-  id: string;
+  id: KanbanColumnId | "cancelled";
   title: string;
   count: number;
   children: React.ReactNode;
@@ -385,6 +441,16 @@ function DraggableBoardCard({
             <X className="h-4 w-4" />
             Cancel
           </Button>
+          {isAwaitingPayment(order) && (
+            <Button
+              size="sm"
+              type="button"
+              variant="secondary"
+              onClick={() => onPatch({ payment_status: "paid", status: "preparing" })}
+            >
+              Mark paid
+            </Button>
+          )}
         </>
       )}
       {(order.status === "confirmed" || order.status === "paid") && (

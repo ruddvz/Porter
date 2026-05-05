@@ -58,7 +58,9 @@ type Bundle = Record<
   | "awaiting_payment_missing"
   | "awaiting_payment_no_link"
   | "monthly_order_cap"
-  | "payment_reminder",
+  | "payment_reminder"
+  | "off_hours_closed"
+  | "min_order_not_met",
   string
 >;
 
@@ -85,6 +87,9 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     awaiting_payment_no_link: "No payment link on file. Please contact the store.",
     monthly_order_cap: "You've reached the order limit for this month.",
     payment_reminder: "Pay ₹{amount} here 👇\n{url}",
+    off_hours_closed:
+      "{store} is closed right now. We'll be back during opening hours — send your order again then!",
+    min_order_not_met: "Minimum order is ₹{min}. Your cart is ₹{total}. Add more items and try again.",
   },
   gujarati: {
     parse_failed: "સમજાયું નથી — ફરી તમારી લિસ્ટ મોકલો (ગુજરાતી / હિન્દી / English).",
@@ -108,6 +113,8 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     awaiting_payment_no_link: "પેમેન્ટ લિંક નથી. સ્ટોરનો સંપર્ક કરો.",
     monthly_order_cap: "આ મહિનાનો ઓર્ડર મર્યાદા સમાપ્ત.",
     payment_reminder: "₹{amount} અહીં ચૂકવો 👇\n{url}",
+    off_hours_closed: "{store} હમણાં બંધ છે. ખુલવાના સમયે ફરી ઓર્ડર મોકલો!",
+    min_order_not_met: "ન્યૂનતમ ઓર્ડર ₹{min} છે. તમારી લિસ્ટ ₹{total}. વધુ વસ્તુઓ ઉમેરો.",
   },
   hindi: {
     parse_failed: "समझ नहीं आया — कृपया अपनी सूची फिर भेजें (गुजराती / हिंदी / English)।",
@@ -131,6 +138,8 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     awaiting_payment_no_link: "पेमेंट लिंक नहीं है। स्टोर से संपर्क करें।",
     monthly_order_cap: "इस महीने का ऑर्डर लिमिट पूरा हो गया।",
     payment_reminder: "₹{amount} यहाँ भुगतान करें 👇\n{url}",
+    off_hours_closed: "{store} अभी बंद है। खुलने के बाद फिर ऑर्डर भेजें!",
+    min_order_not_met: "न्यूनतम ऑर्डर ₹{min} है। आपकी लिस्ट ₹{total} है। और आइटम जोड़ें।",
   },
 };
 

@@ -7,16 +7,32 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import type { Order } from "@/types";
-import { Copy, GripHorizontal, MapPin, Printer, X } from "lucide-react";
+import type { Order, Seller } from "@/types";
+import { Copy, GripHorizontal, MapPin, MessageCircle, Printer, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function waMeLink(phone: string, text: string) {
+  const digits = phone.replace(/\D/g, "");
+  const n = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+
 export default function OrderDetailPanel({
+  seller,
   order,
   onClose,
   onSaved,
   onOrderUpdate,
 }: {
+  seller: Pick<Seller, "store_name" | "delivery_fee" | "city">;
   order: OrderWithItems | null;
   onClose: () => void;
   onSaved: () => void;
@@ -89,21 +105,46 @@ export default function OrderDetailPanel({
     if (!o) return;
     const w = window.open("", "_blank");
     if (!w) return;
-    const lines =
-      o.order_items?.map((i) => `${i.product_name}\t${i.quantity}\t${i.unit}\t₹${i.unit_price}\t₹${i.total_price}`) ?? [];
-    w.document.write(`<pre style="font-family:system-ui;padding:16px">${[
-      `Order ${o.id.slice(0, 8)}`,
-      `${o.customer_name || ""} ${o.customer_phone}`,
-      `${o.delivery_area || ""} ${o.delivery_address || ""}`,
-      "",
-      ...lines,
-      "",
-      `Total ₹${o.total_amount}`,
-    ].join("\n")}</pre>`);
+    const fee = seller.delivery_fee != null ? Number(seller.delivery_fee) : 0;
+    const sub = Number(o.total_amount ?? 0);
+    const grand = sub + (Number.isFinite(fee) ? fee : 0);
+    const rows =
+      o.order_items?.map(
+        (i) =>
+          `<tr><td>${escapeHtml(i.product_name)}</td><td class="num">${i.quantity} ${escapeHtml(i.unit)}</td><td class="num">₹${Number(i.unit_price).toFixed(2)}</td><td class="num">₹${Number(i.total_price).toFixed(2)}</td></tr>`,
+      ) ?? [];
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt ${escapeHtml(o.id.slice(0, 8))}</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;padding:24px;max-width:480px;margin:0 auto;color:#111}
+  h1{font-size:1.25rem;margin:0 0 4px}
+  .muted{color:#555;font-size:12px}
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+  th{text-align:left;border-bottom:1px solid #ddd;padding:8px 4px}
+  td{padding:8px 4px;border-bottom:1px solid #eee}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .tot{margin-top:16px;font-size:15px}
+  .grand{font-weight:700;font-size:18px;margin-top:8px}
+  @media print{body{padding:12px}}
+</style></head><body>
+  <h1>${escapeHtml(seller.store_name)}</h1>
+  <p class="muted">${seller.city ? escapeHtml(seller.city) + " · " : ""}Order #${escapeHtml(o.id.slice(0, 8))}</p>
+  <p class="muted">${new Date(o.created_at).toLocaleString()}</p>
+  <p><strong>${escapeHtml(o.customer_name || "Customer")}</strong><br/><span class="muted">${escapeHtml(o.customer_phone)}</span></p>
+  <p class="muted">${escapeHtml(o.delivery_area || "")} ${escapeHtml(o.delivery_address || "")}</p>
+  <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Line</th></tr></thead><tbody>
+  ${rows.join("")}
+  </tbody></table>
+  <div class="tot">Subtotal <span style="float:right">₹${sub.toFixed(2)}</span></div>
+  ${fee > 0 ? `<div class="tot">Delivery <span style="float:right">₹${fee.toFixed(2)}</span></div>` : ""}
+  <div class="grand">Total <span style="float:right">₹${grand.toFixed(2)}</span></div>
+  <p class="muted" style="margin-top:24px">Thank you for your order.</p>
+</body></html>`;
+    w.document.write(html);
     w.document.close();
+    w.focus();
     w.print();
     w.close();
-  }, [o]);
+  }, [o, seller]);
 
   if (!o) return null;
 
@@ -294,6 +335,21 @@ export default function OrderDetailPanel({
                 Mark cash collected
               </Button>
             )}
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                window.open(
+                  waMeLink(o.customer_phone, `Hi${o.customer_name ? ` ${o.customer_name}` : ""}, regarding order #${o.id.slice(0, 8)} — `),
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+            >
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </Button>
             <Button type="button" variant="secondary" size="sm" onClick={printOrder}>
               <Printer className="h-4 w-4" />
               Print

@@ -2,7 +2,7 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { BotLanguagePreference, Seller, WorkingHoursMap } from "@/types";
-import { checkGate } from "@/lib/plan-gates";
+import { checkGate, planLimits } from "@/lib/plan-gates";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -25,7 +25,8 @@ function emptyHours(): WorkingHoursMap {
   return m;
 }
 
-export default function SettingsClient({ seller }: { seller: Seller }) {
+export default function SettingsClient({ seller, ordersThisMonth }: { seller: Seller; ordersThisMonth: number }) {
+  const lim = planLimits(seller.plan ?? "starter");
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
   const [tab, setTab] = useState<Tab>("store");
@@ -38,6 +39,10 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
 
   const [zoneInput, setZoneInput] = useState("");
   const [zones, setZones] = useState<string[]>(seller.delivery_zones ?? []);
+  const [timezone, setTimezone] = useState(seller.timezone ?? "Asia/Kolkata");
+  const [minOrder, setMinOrder] = useState(seller.min_order_amount != null ? String(seller.min_order_amount) : "");
+  const [deliveryFee, setDeliveryFee] = useState(seller.delivery_fee != null ? String(seller.delivery_fee) : "");
+  const [offHoursMsg, setOffHoursMsg] = useState(seller.off_hours_message ?? "");
 
   const [showRzpId, setShowRzpId] = useState(false);
   const [showRzpSecret, setShowRzpSecret] = useState(false);
@@ -105,11 +110,22 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
       toast(gate.reason, "error");
       return;
     }
+    const minN = parseFloat(minOrder);
+    const feeN = parseFloat(deliveryFee);
     setBusy(true);
-    const { error } = await supabase.from("sellers").update({ delivery_zones: zones }).eq("id", seller.id);
+    const { error } = await supabase
+      .from("sellers")
+      .update({
+        delivery_zones: zones,
+        timezone: timezone.trim() || "Asia/Kolkata",
+        min_order_amount: minOrder.trim() && Number.isFinite(minN) ? minN : null,
+        delivery_fee: deliveryFee.trim() && Number.isFinite(feeN) ? feeN : null,
+        off_hours_message: offHoursMsg.trim() || null,
+      })
+      .eq("id", seller.id);
     setBusy(false);
     if (error) toast(error.message, "error");
-    else toast("Delivery zones saved", "success");
+    else toast("Delivery settings saved", "success");
   }
 
   async function savePayments() {
@@ -274,8 +290,47 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
             </div>
           </div>
           <p className="text-xs text-porter-text-muted">Starter: one zone. Growth: unlimited.</p>
+          <Input.Text
+            id="tz"
+            label="Timezone (IANA)"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            placeholder="Asia/Kolkata"
+            hint="Used with Hours tab for open/closed checks."
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input.Text
+              id="min-order"
+              label="Minimum order (₹)"
+              inputVariant="number"
+              value={minOrder}
+              onChange={(e) => setMinOrder(e.target.value)}
+              min={0}
+              step={1}
+              hint="Optional — bot blocks checkout below this total."
+            />
+            <Input.Text
+              id="del-fee"
+              label="Delivery fee (₹)"
+              inputVariant="number"
+              value={deliveryFee}
+              onChange={(e) => setDeliveryFee(e.target.value)}
+              min={0}
+              step={1}
+              hint="Shown on printed receipt."
+            />
+          </div>
+          <Input.Textarea
+            id="off-hours"
+            label="Off-hours auto-reply"
+            rows={3}
+            value={offHoursMsg}
+            onChange={(e) => setOffHoursMsg(e.target.value)}
+            placeholder="We're closed now — we'll reply when we open."
+            hint="Sent when a customer messages outside working hours (see Hours tab)."
+          />
           <Button type="button" loading={busy} onClick={() => void saveDelivery()}>
-            Save zones
+            Save delivery settings
           </Button>
         </Card>
       )}
@@ -401,10 +456,20 @@ export default function SettingsClient({ seller }: { seller: Seller }) {
 
       {tab === "subscription" && (
         <Card padding="lg" className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-title">Current plan</p>
-            <Badge kind="plan" variant={seller.plan === "growth" ? "growth" : "starter"} label={seller.plan} />
-            <span className="text-sm text-porter-text-muted">Joined {new Date(seller.created_at).toLocaleDateString()}</span>
+          <div className="rounded-lg border border-porter-bg-border bg-porter-bg-surface p-4">
+            <p className="text-label text-porter-text-muted">Orders this month</p>
+            <p className="mt-1 font-display text-3xl text-porter-text-primary">
+              {ordersThisMonth}
+              <span className="text-lg font-sans text-porter-text-secondary">
+                {" "}
+                / {seller.plan === "growth" ? "∞" : String(lim.maxOrdersPerMonth)}
+              </span>
+            </p>
+            {seller.plan === "starter" && ordersThisMonth >= lim.maxOrdersPerMonth * 0.85 && (
+              <p className="mt-2 text-xs text-porter-orange-500">
+                Approaching your monthly cap — upgrade to Growth for unlimited orders.
+              </p>
+            )}
           </div>
           <Table
             columns={[

@@ -12,7 +12,7 @@ import type { OrderWithItems } from "@/lib/orders-ui";
 import { formatCurrencyInr, itemSummaryLine, orderStatusBadge, paymentBadge, timeAgoLabel } from "@/lib/orders-ui";
 import { checkGate } from "@/lib/plan-gates";
 import { useSharedNow } from "@/lib/hooks/useSharedNow";
-import type { OrderStatus, SellerPlan } from "@/types";
+import type { OrderStatus, Seller } from "@/types";
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -24,16 +24,15 @@ function todayISO() {
 }
 
 export default function OrderHistoryClient({
-  sellerId,
-  sellerPlan,
+  seller,
   initialOrders,
   pageSize,
 }: {
-  sellerId: string;
-  sellerPlan: SellerPlan;
+  seller: Seller;
   initialOrders: OrderWithItems[];
   pageSize: number;
 }) {
+  const sellerId = seller.id;
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
   const nowMs = useSharedNow();
@@ -104,7 +103,7 @@ export default function OrderHistoryClient({
   }, [page, pageSize, sellerId, supabase, toast]);
 
   function exportCsv() {
-    const gate = checkGate({ plan: sellerPlan }, "csv_export");
+    const gate = checkGate({ plan: seller.plan }, "csv_export");
     if (!gate.ok) {
       toast(gate.reason, "error");
       return;
@@ -281,6 +280,7 @@ export default function OrderHistoryClient({
 
       {panel && (
         <OrderDetailPanel
+          seller={seller}
           order={panel}
           onClose={() => setPanel(null)}
           onSaved={() => setPanel(null)}

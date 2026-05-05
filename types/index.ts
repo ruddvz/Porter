@@ -41,6 +41,14 @@ export interface Seller {
   whatsapp_number: string;
   city: string | null;
   delivery_zones: string[] | null;
+  /** IANA timezone for working-hours checks (default Asia/Kolkata in code). */
+  timezone?: string | null;
+  /** Minimum order amount (₹) before checkout — optional. */
+  min_order_amount?: number | null;
+  /** Flat delivery fee (₹) shown on receipt — optional. */
+  delivery_fee?: number | null;
+  /** Reply when customer writes outside working hours. */
+  off_hours_message?: string | null;
   upi_id: string | null;
   razorpay_key_id: string | null;
   razorpay_key_secret: string | null;
