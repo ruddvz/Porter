@@ -71,6 +71,10 @@ export interface Seller {
   upi_id_enc?: string | null;
   razorpay_key_id_enc?: string | null;
   razorpay_key_secret_enc?: string | null;
+  /** Award ₹1 loyalty point per ₹ of delivered orders when enabled (Growth). */
+  loyalty_points_enabled?: boolean | null;
+  /** Optional referral code for Growth stores. */
+  referral_code?: string | null;
 }
 
 export interface Product {
@@ -97,6 +101,8 @@ export interface Customer {
   default_area: string | null;
   default_address: string | null;
   order_count: number;
+  loyalty_points?: number;
+  referred_by_code?: string | null;
   created_at: string;
 }
 
@@ -119,6 +125,11 @@ export interface Order {
   created_at: string;
   paid_at: string | null;
   delivered_at: string | null;
+  /** Unguessable slug for /track/[slug] public status page. */
+  track_public_slug?: string | null;
+  /** Optional next-day / scheduled delivery window. */
+  scheduled_for?: string | null;
+  rider_label?: string | null;
 }
 
 export interface OrderItem {
@@ -157,6 +168,10 @@ export interface ConversationContext {
   razorpay_order_id?: string;
   /** When bot_language is auto: first detected customer language for consistent replies */
   detected_reply_lang?: "gujarati" | "hindi" | "english";
+  /** Customer-requested delivery time (ISO string), from phrases like "kal subah". */
+  scheduled_for?: string;
+  /** Referral code detected in customer message (Growth store). */
+  referral_code?: string;
 }
 
 export interface ParsedLineItem {

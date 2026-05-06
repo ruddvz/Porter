@@ -97,6 +97,17 @@ export default function AnalyticsClient({
     return { newish: neu, returning: ret };
   }, [initialOrders]);
 
+  const peakHourBuckets = useMemo(() => {
+    const hrs = Array.from({ length: 24 }, (_, hour) => ({ hour, orders: 0 }));
+    for (const o of initialOrders) {
+      const h = new Date(o.created_at).getHours();
+      hrs[h].orders += 1;
+    }
+    return hrs;
+  }, [initialOrders]);
+
+  const peakMax = useMemo(() => Math.max(1, ...peakHourBuckets.map((x) => x.orders)), [peakHourBuckets]);
+
   return (
     <div className="space-y-6 px-3 py-4 md:px-6 md:py-6">
       <div>
@@ -158,6 +169,23 @@ export default function AnalyticsClient({
           </div>
         </Card>
       </div>
+
+      <Card padding="md">
+        <h2 className="text-title">Peak hours (local)</h2>
+        <p className="mt-1 text-xs text-porter-text-muted">Order volume by hour of day in your analytics window.</p>
+        <div className="mt-4 grid gap-1" style={{ gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
+          {peakHourBuckets.map((b) => (
+            <div key={b.hour} className="flex flex-col items-center gap-1">
+              <div
+                className="w-full min-h-[6px] rounded-sm bg-porter-green-500/80 transition-opacity"
+                style={{ opacity: 0.15 + (0.85 * b.orders) / peakMax, height: `${8 + (44 * b.orders) / peakMax}px` }}
+                title={`${b.hour}:00 — ${b.orders} orders`}
+              />
+              <span className="text-[9px] text-porter-text-muted">{b.hour}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card padding="md">
         <h2 className="text-title">Top products</h2>

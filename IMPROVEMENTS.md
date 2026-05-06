@@ -288,27 +288,27 @@ These are bugs or missing features that break the core product promise.
 
 ### Phase 3 — System Depth (reliability, security, monetization)
 
-**Progress:** Tasks **13–16** partially shipped — UPI-first bot flow, `order_events` + Activity panel, Meta token encryption via encrypt API, Razorpay link retries + webhook JSON log lines + event inserts. Still open: admin export (#17), billing (#18), full log drain.
+**Done (MVP):** Encryption paths, `order_events`, UPI-first checkout, Razorpay retries + webhook events, **admin orders CSV** (`/api/admin/export/orders`), **live `platform_events`** after migrations **010–012**, **billing stub** (`GET /api/billing/status` — manual SaaS billing explained). Automated Razorpay Subscriptions for Porter billing is **not** wired; sellers still upgrade manually.
 
-| # | Task | Files Touched |
-|---|------|---------------|
-| 13 | Encrypt Razorpay + Meta secrets at rest using `field-crypto.ts` | `lib/field-crypto.ts`, `lib/seller-credentials.ts`, `app/api/seller/encrypt-payments/route.ts` |
-| 14 | `order_events` audit trail table + timeline UI | `009_order_events.sql`, `components/orders/OrderDetailPanel.tsx` |
-| 15 | UPI manual payment conversation path | `lib/conversation.ts`, `lib/bot-locale.ts`, `app/dashboard/ui.tsx` |
-| 16 | Structured logging + Razorpay retry loop in webhook | `app/api/webhook/razorpay/route.ts`, `lib/razorpay.ts` |
-| 17 | Admin CSV/XLSX bulk export + `platform_events` activity feed | `app/admin/` routes |
-| 18 | Billing / subscription integration (Razorpay Subscriptions) | new `app/api/billing/` routes, `app/dashboard/settings/ui.tsx` |
+| # | Task | Files / notes |
+|---|------|----------------|
+| 13 | Encrypt Razorpay + Meta secrets at rest | `field-crypto.ts`, `seller-credentials.ts`, `encrypt-payments` API |
+| 14 | `order_events` + Activity UI | `009_order_events.sql`, `OrderDetailPanel` |
+| 15 | UPI manual path | `conversation.ts`, `bot-locale.ts`, Kanban |
+| 16 | Razorpay retries + webhook logging | `lib/razorpay.ts`, `webhook/razorpay` |
+| 17 | Admin CSV + platform activity | `app/api/admin/export/orders`, `AdminActivityFeed`, **010** policy + **012** realtime |
+| 18 | Billing integration | Stub: `app/api/billing/status`; Growth tab calls it |
 
-### Phase 4 — Growth Features (new capabilities)
+### Phase 4 — Growth Features
 
-| # | Task |
-|---|------|
-| 19 | Peak-hour heatmap in seller analytics |
-| 20 | Broadcast message API — send a WhatsApp message to all customers |
-| 21 | Referral / loyalty points system |
-| 22 | Multi-rider / delivery partner assignment |
-| 23 | Scheduled orders (pre-order for next morning) |
-| 24 | Customer-facing order tracking page (`/track/[orderId]`) |
+| # | Task | Status |
+|---|------|--------|
+| 19 | Peak-hour heatmap | Seller `/dashboard/analytics` |
+| 20 | Broadcast WhatsApp | `POST /api/seller/broadcast`, Settings → Growth |
+| 21 | Referral + loyalty | Growth tab; DB trigger on delivered; bot captures referral word |
+| 22 | Rider label | Order panel + optional on `/track` |
+| 23 | Scheduled orders | `scheduled_for` column + bot hints (`kal subah`, etc.) |
+| 24 | Public tracking | `/track/[slug]` + RPC `get_order_by_track_slug` |
 
 ---
 

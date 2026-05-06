@@ -8,7 +8,10 @@ export type PlanGateFeature =
   | "nudge_cron"
   | "custom_bot_greeting"
   | "delivery_zones"
-  | "csv_export";
+  | "csv_export"
+  | "whatsapp_broadcast"
+  | "loyalty_program"
+  | "referral_code";
 
 export type PlanGateResult = { ok: true } | { ok: false; reason: string; upgradeTo?: SellerPlan };
 
@@ -69,6 +72,11 @@ export function checkGate(
 
   if (feature === "csv_export") {
     if (p !== "growth") return { ok: false, reason: "CSV export is available on Growth plan.", upgradeTo: "growth" };
+    return { ok: true };
+  }
+
+  if (feature === "whatsapp_broadcast" || feature === "loyalty_program" || feature === "referral_code") {
+    if (p !== "growth") return { ok: false, reason: "This feature is available on Growth plan.", upgradeTo: "growth" };
     return { ok: true };
   }
 

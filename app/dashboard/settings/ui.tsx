@@ -12,7 +12,7 @@ import { Table } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
 import { useMemo, useState } from "react";
 
-type Tab = "store" | "delivery" | "payments" | "bot" | "hours" | "meta" | "subscription" | "danger";
+type Tab = "store" | "delivery" | "payments" | "bot" | "hours" | "meta" | "subscription" | "growth" | "danger";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -71,6 +71,11 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
   const [metaToken, setMetaToken] = useState("");
 
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+
+  const [loyaltyOn, setLoyaltyOn] = useState(!!seller.loyalty_points_enabled);
+  const [referralCode, setReferralCode] = useState((seller.referral_code ?? "").toUpperCase());
+  const [broadcastText, setBroadcastText] = useState("");
+  const [billingInfo, setBillingInfo] = useState<string | null>(null);
 
   function addZone() {
     const z = zoneInput
@@ -211,6 +216,66 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
     }
   }
 
+  async function saveGrowth() {
+    if (seller.plan !== "growth") {
+      toast("Growth features require the Growth plan.", "error");
+      return;
+    }
+    const gLoyalty = checkGate(seller, "loyalty_program");
+    const gRef = checkGate(seller, "referral_code");
+    if (!gLoyalty.ok || !gRef.ok) {
+      toast("Growth plan required.", "error");
+      return;
+    }
+    setBusy(true);
+    const code = referralCode.trim().toUpperCase() || null;
+    const { error } = await supabase
+      .from("sellers")
+      .update({
+        loyalty_points_enabled: loyaltyOn,
+        referral_code: code,
+      })
+      .eq("id", seller.id);
+    setBusy(false);
+    if (error) toast(error.message, "error");
+    else toast("Growth options saved", "success");
+  }
+
+  async function sendBroadcast() {
+    const g = checkGate(seller, "whatsapp_broadcast");
+    if (!g.ok) {
+      toast(g.reason, "error");
+      return;
+    }
+    if (!broadcastText.trim()) {
+      toast("Enter a message", "error");
+      return;
+    }
+    setBusy(true);
+    const res = await fetch("/api/seller/broadcast", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: broadcastText.trim() }),
+    });
+    setBusy(false);
+    const j = (await res.json().catch(() => ({}))) as { error?: string; sent?: number };
+    if (!res.ok) {
+      toast(j.error ?? "Broadcast failed", "error");
+      return;
+    }
+    toast(`Sent to ${j.sent ?? 0} customers`, "success");
+    setBroadcastText("");
+  }
+
+  async function loadBilling() {
+    setBusy(true);
+    const res = await fetch("/api/billing/status");
+    setBusy(false);
+    const j = (await res.json().catch(() => ({}))) as { message?: string; plan?: string };
+    if (res.ok) setBillingInfo(`${j.message ?? ""} (plan: ${j.plan ?? "—"})`);
+    else setBillingInfo("Could not load billing status.");
+  }
+
   async function deactivate() {
     setBusy(true);
     const { error } = await supabase.from("sellers").update({ is_active: false }).eq("id", seller.id);
@@ -229,6 +294,7 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
         { id: "hours" as const, label: "Hours" },
         { id: "meta" as const, label: "WhatsApp API" },
         { id: "subscription" as const, label: "Plan" },
+        { id: "growth" as const, label: "Growth" },
         { id: "danger" as const, label: "Danger" },
       ] as const,
     [],
@@ -462,6 +528,54 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
           <Button type="button" loading={busy} onClick={() => void saveMeta()}>
             Save
           </Button>
+        </Card>
+      )}
+
+      {tab === "growth" && (
+        <Card padding="lg" className="space-y-4">
+          {seller.plan !== "growth" ? (
+            <p className="text-body text-porter-text-secondary">Switch to Growth to use loyalty, referral codes, and customer broadcasts.</p>
+          ) : (
+            <>
+              <label className="flex cursor-pointer items-center gap-2 text-body">
+                <input type="checkbox" checked={loyaltyOn} onChange={(e) => setLoyaltyOn(e.target.checked)} />
+                Enable loyalty points (₹1 of delivered order = 1 point)
+              </label>
+              <Input.Text
+                id="ref-code"
+                label="Referral code (customers mention it in their order message)"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                placeholder="e.g. FRESH20"
+              />
+              <Button type="button" loading={busy} onClick={() => void saveGrowth()}>
+                Save growth options
+              </Button>
+              <div className="border-t border-porter-bg-border pt-4">
+                <Input.Textarea
+                  id="broadcast"
+                  label="Broadcast to all past customers (WhatsApp)"
+                  rows={3}
+                  value={broadcastText}
+                  onChange={(e) => setBroadcastText(e.target.value)}
+                  placeholder="Store update, offer, or timing change…"
+                />
+                <Button type="button" variant="secondary" className="mt-2" loading={busy} onClick={() => void sendBroadcast()}>
+                  Send broadcast
+                </Button>
+              </div>
+              <div className="border-t border-porter-bg-border pt-4">
+                <p className="text-label text-porter-text-muted">Billing</p>
+                <p className="mt-1 text-sm text-porter-text-secondary">
+                  Porter subscription billing is manual today — check status for your account.
+                </p>
+                <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => void loadBilling()}>
+                  Refresh billing status
+                </Button>
+                {billingInfo ? <p className="mt-2 text-sm text-porter-text-secondary">{billingInfo}</p> : null}
+              </div>
+            </>
+          )}
         </Card>
       )}
 

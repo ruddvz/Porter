@@ -36,6 +36,8 @@ import {
   type ReplyLang,
 } from "@/lib/bot-locale";
 import { isSellerWithinWorkingHours } from "@/lib/working-hours";
+import { parseReferralHint } from "@/lib/referral";
+import { parseScheduledDeliveryHint } from "@/lib/scheduled-delivery";
 
 function geminiLangOpts(seller: Seller) {
   return { botLanguage: normalizeBotLanguagePref(seller.bot_language) as BotLanguagePreference };
@@ -421,6 +423,14 @@ async function continueNormalParse(
     (i) => `• ${i.product_name} — ${i.quantity} ${i.unit} × ₹${i.unit_price} = ₹${i.total_price}`
   );
 
+  const scheduledIso = parseScheduledDeliveryHint(text);
+  const refCode =
+    seller.plan === "growth" ? parseReferralHint(text, seller.referral_code ?? undefined) : null;
+  const extraCtx = {
+    ...(scheduledIso ? { scheduled_for: scheduledIso } : {}),
+    ...(refCode ? { referral_code: refCode } : {}),
+  } satisfies Partial<ConversationContext>;
+
   if (!seller.cod_enabled) {
     const zones = seller.delivery_zones ?? [];
     const zoneHint = zones.length > 0 ? `\n\nDelivery areas: ${zones.join(", ")}` : "";
@@ -428,7 +438,13 @@ async function continueNormalParse(
       .from("conversations")
       .update({
         state: "collecting_area",
-        context: { ...ctx, items: parsed, order_total: total, payment_method: "upi_manual" as PaymentMethod },
+        context: {
+          ...ctx,
+          items: parsed,
+          order_total: total,
+          payment_method: "upi_manual" as PaymentMethod,
+          ...extraCtx,
+        },
         last_message_at: now,
       })
       .eq("id", conversation.id);
@@ -443,7 +459,7 @@ async function continueNormalParse(
     .from("conversations")
     .update({
       state: "collecting_payment_method",
-      context: { ...ctx, items: parsed, order_total: total },
+      context: { ...ctx, items: parsed, order_total: total, ...extraCtx },
       last_message_at: now,
     })
     .eq("id", conversation.id);
@@ -651,6 +667,13 @@ async function adjustProductStockAfterOrder(
   }
 }
 
+function trackOrderAppend(order: Order): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const slug = (order as { track_public_slug?: string | null }).track_public_slug;
+  if (!base || !slug) return "";
+  return `\n\nTrack: ${base}/track/${slug}`;
+}
+
 async function notifyOrderPush(sellerId: string, title: string, body: string) {
   const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   const secret = process.env.PUSH_INTERNAL_SECRET;
@@ -735,6 +758,7 @@ async function finalizeOrderFromContext(
         phone_number: phone,
         default_area: area,
         default_address: address,
+        ...(ctx.referral_code ? { referred_by_code: ctx.referral_code } : {}),
       },
       { onConflict: "seller_id,phone_number" }
     )
@@ -742,6 +766,14 @@ async function finalizeOrderFromContext(
     .single();
 
   const customerId = cust?.id as string | undefined;
+
+  if (ctx.referral_code && customerId) {
+    await supabase
+      .from("customers")
+      .update({ referred_by_code: ctx.referral_code })
+      .eq("id", customerId)
+      .is("referred_by_code", null);
+  }
 
   const paymentStatus: PaymentStatus = paymentMethod === "cod" ? "cod_pending" : "unpaid";
   const orderStatus: OrderStatus = paymentMethod === "cod" ? "confirmed" : "pending";
@@ -759,6 +791,7 @@ async function finalizeOrderFromContext(
     payment_status: paymentStatus,
   };
   if (ctx.notes) insertPayload.notes = ctx.notes;
+  if (ctx.scheduled_for) insertPayload.scheduled_for = ctx.scheduled_for;
 
   const { data: order, error: orderErr } = await supabase.from("orders").insert(insertPayload).select("*").single();
 
@@ -848,7 +881,7 @@ async function finalizeOrderFromContext(
       .eq("id", conversation.id);
 
     const msg = formatConfirm(
-      formatOrderConfirmedPrepaid(lang, summary, area, address, total, link.short_url, seller.store_name)
+      `${formatOrderConfirmedPrepaid(lang, summary, area, address, total, link.short_url, seller.store_name)}${trackOrderAppend(order)}`
     );
     await sendMessage(phone, msg, seller);
     return;
@@ -870,7 +903,7 @@ async function finalizeOrderFromContext(
         "awaiting_upi_instructions",
         lang,
         { amount: String(total), upi, shortId }
-      )}`
+      )}${trackOrderAppend(order)}`
     );
     await sendMessage(phone, msg, seller);
     void notifyOrderPush(seller.id, "New order — UPI pending", `₹${total} — ${shortId}`);
@@ -886,7 +919,7 @@ async function finalizeOrderFromContext(
     })
     .eq("id", conversation.id);
 
-  const codMsg = formatConfirm(formatOrderConfirmedCod(lang, summary, area, address, total, seller.store_name));
+  const codMsg = formatConfirm(`${formatOrderConfirmedCod(lang, summary, area, address, total, seller.store_name)}${trackOrderAppend(order)}`);
   await sendMessage(phone, codMsg, seller);
   void notifyOrderPush(seller.id, "New order", `₹${total} — ${order.id.slice(0, 8)}`);
 }

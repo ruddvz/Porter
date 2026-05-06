@@ -5,6 +5,7 @@ import { formatCurrencyInr, orderStatusBadge, paymentBadge } from "@/lib/orders-
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import type { Order, Seller } from "@/types";
@@ -46,10 +47,15 @@ export default function OrderDetailPanel({
   const [cancelOpen, setCancelOpen] = useState(false);
 
   const [events, setEvents] = useState<{ event_type: string; note: string | null; created_at: string }[]>([]);
+  const [riderLabel, setRiderLabel] = useState(o?.rider_label ?? "");
 
   useEffect(() => {
     setNote(order?.notes ?? "");
   }, [order?.id, order?.notes]);
+
+  useEffect(() => {
+    setRiderLabel(o?.rider_label ?? "");
+  }, [o?.id, o?.rider_label]);
 
   useEffect(() => {
     if (!o?.id || !seller.id) {
@@ -106,6 +112,24 @@ export default function OrderDetailPanel({
       onSaved();
     }
   }, [o, onOrderUpdate, onSaved, seller.id, supabase, toast]);
+
+  const saveRider = useCallback(async () => {
+    if (!o) return;
+    setBusy(true);
+    const prev = o.rider_label;
+    onOrderUpdate?.({ ...o, rider_label: riderLabel.trim() || null });
+    const { error } = await supabase
+      .from("orders")
+      .update({ rider_label: riderLabel.trim() || null })
+      .eq("id", o.id);
+    setBusy(false);
+    if (error) {
+      onOrderUpdate?.({ ...o, rider_label: prev });
+      toast(error.message, "error");
+    } else {
+      toast("Rider label saved", "success");
+    }
+  }, [o, onOrderUpdate, riderLabel, supabase, toast]);
 
   const markCodCollected = useCallback(async () => {
     if (!o) return;
@@ -253,6 +277,24 @@ export default function OrderDetailPanel({
                 {o.delivery_address || "—"}
               </span>
             </p>
+            {o.scheduled_for ? (
+              <p className="mt-2 text-sm text-amber-200/90">Requested for: {new Date(o.scheduled_for).toLocaleString()}</p>
+            ) : null}
+          </section>
+
+          <section className="mt-6">
+            <h3 className="text-label text-porter-text-muted">Rider / delivery</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Input.Text
+                id="rider"
+                label="Rider or vehicle note"
+                className="min-w-[200px] flex-1"
+                value={riderLabel}
+                onChange={(e) => setRiderLabel(e.target.value)}
+                onBlur={() => void saveRider()}
+                placeholder="e.g. Blue Activa / Ravi bhai"
+              />
+            </div>
           </section>
 
           <section className="mt-6">

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Porter — Feature checklist</title>
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <p class="eyebrow">Roadmap snapshot</p>
+        <h1>Implementation checklist</h1>
+        <p class="lead">Green = shipped in this branch. Apply Supabase migrations through <code>011_referral_codes.sql</code> for full DB support.</p>
+      </header>
+
+      <section class="card">
+        <h2>Phase 3 — System</h2>
+        <ul class="checklist">
+          <li><span class="ok">✓</span> UPI manual + COD-first bot flow</li>
+          <li><span class="ok">✓</span> <code>order_events</code> audit + Activity panel</li>
+          <li><span class="ok">✓</span> Meta token encryption path</li>
+          <li><span class="ok">✓</span> Razorpay retries + webhook logging</li>
+          <li><span class="ok">✓</span> Admin orders CSV export</li>
+          <li><span class="ok">✓</span> Billing status stub API (<code>/api/billing/status</code>)</li>
+          <li><span class="ok">✓</span> Live <code>platform_events</code> feed (needs migration <code>010</code> for admin SELECT)</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Phase 4 — Growth</h2>
+        <ul class="checklist">
+          <li><span class="ok">✓</span> Peak-hour heatmap (seller analytics)</li>
+          <li><span class="ok">✓</span> Broadcast API + Growth settings tab</li>
+          <li><span class="ok">✓</span> Loyalty points (trigger on delivered; Growth toggle)</li>
+          <li><span class="ok">✓</span> Referral code on seller + bot capture</li>
+          <li><span class="ok">✓</span> Rider label on orders + track page</li>
+          <li><span class="ok">✓</span> Scheduled delivery hint + <code>scheduled_for</code></li>
+          <li><span class="ok">✓</span> Public tracking page <code>/track/[slug]</code></li>
+        </ul>
+      </section>
+
+      <p class="foot"><a href="index.html">← Back</a></p>
+    </div>
+  </body>
+</html>
