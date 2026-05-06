@@ -1,6 +1,8 @@
+import AdminActivityFeed from "@/components/admin/AdminActivityFeed";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
 import { Table } from "@/components/ui/Table";
+import { fetchRecentPlatformEvents } from "@/lib/admin-platform-events";
 import { fetchAdminOverview } from "@/lib/admin-overview";
 import Link from "next/link";
 
@@ -8,12 +10,21 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminOverviewPage() {
   const data = await fetchAdminOverview();
+  const initialEvents = await fetchRecentPlatformEvents(40);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-heading">Platform overview</h1>
-        <p className="mt-1 text-body text-porter-text-secondary">Live snapshot across all sellers.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-heading">Platform overview</h1>
+          <p className="mt-1 text-body text-porter-text-secondary">Live snapshot across all sellers.</p>
+        </div>
+        <a
+          href="/api/admin/export/orders"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-porter-bg-border bg-transparent px-3 text-sm font-semibold text-porter-text-primary hover:bg-porter-bg-raised"
+        >
+          Download orders CSV
+        </a>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
@@ -56,8 +67,10 @@ export default async function AdminOverviewPage() {
         </div>
       </Card>
 
+      <AdminActivityFeed initial={initialEvents} />
+
       <Card padding="md">
-        <h2 className="text-title">Recent platform events</h2>
+        <h2 className="text-title">Recent platform events (snapshot)</h2>
         <div className="mt-4">
           <Table
             columns={[

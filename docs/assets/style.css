@@ -1,0 +1,134 @@
+:root {
+  --bg: #0a0a0f;
+  --card: #12121a;
+  --border: #2a2a3a;
+  --text: #e8e8ef;
+  --muted: #8888a0;
+  --green: #25d366;
+  --orange: #ff6b35;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.hero h1 {
+  font-size: 2.25rem;
+  margin: 0.25rem 0 0.75rem;
+  letter-spacing: -0.02em;
+}
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--green);
+  margin: 0;
+}
+.lead {
+  color: var(--muted);
+  font-size: 1rem;
+}
+.lead code {
+  background: var(--card);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem 1.35rem;
+  margin-top: 1.25rem;
+}
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+.list li {
+  margin: 0.35rem 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.btn.primary {
+  background: var(--green);
+  color: #041208;
+  border-color: transparent;
+}
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.muted {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 0.75rem;
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.checklist li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+.checklist li:last-child {
+  border-bottom: none;
+}
+.ok {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.foot {
+  margin-top: 2rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+.foot a {
+  color: var(--green);
+}

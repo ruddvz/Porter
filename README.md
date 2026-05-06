@@ -4,8 +4,14 @@
 
 1. Link project: `supabase link` (or use Dashboard SQL editor).
 2. Run migration: paste `supabase/migrations/001_initial_schema.sql` into **SQL Editor** → Run, or use `supabase db push` if CLI is configured.
-3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql`, **`006_product_fields_and_order_preparing.sql`** (product catalog columns + `preparing` order status).  
+3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql`, then **`006_plan_complete.sql`** (full rollout: products + orders `preparing`, seller fields, `platform_settings`, push tables, storage bucket), then **`007_order_items_seller_id.sql`** (denormalizes `seller_id` on `order_items` for realtime line-item updates), then **`008_seller_delivery_extras.sql`** (seller timezone, minimum order, delivery fee, off-hours message), then **`009_order_events.sql`** (`order_events` audit trail + optional `meta_access_token_enc`), then **`010_phase4_platform_events_track_loyalty.sql`**, **`011_referral_codes.sql`**, and **`012_realtime_platform_events.sql`** (admin live feed). If you previously applied **`006_product_fields_and_order_preparing.sql`** only, compare with `006_plan_complete.sql` and apply any missing pieces (do not run duplicate conflicting `ALTER`s blindly).
+
    **Note:** Session 5 was originally named `002_conversation_nudge.sql`; that collided with other `002` migrations. Use **`005_conversation_nudge.sql`** only. If you already ran the old file, skip `005` — the `ALTER` is idempotent.
+
+### GitHub Pages (static preview)
+
+The `docs/` folder is a small **static** site (no server) you can publish to **GitHub Pages** to show project status and branding. A workflow at `.github/workflows/pages.yml` deploys on pushes to `main` (enable **Settings → Pages → Source: GitHub Actions** in the repo). It is **not** a substitute for running the Next.js app.
+
 4. Optional seed: run `supabase/seed.sql` after you have at least one `auth.users` row (sign up via `/auth/signup`).
 
 ### Admin users
@@ -35,3 +41,5 @@ npm run dev
 Webhooks: expose with `ngrok` or Vercel preview; set Meta callback URL to `/api/webhook/whatsapp` and Razorpay webhook to `/api/webhook/razorpay`.
 
 **Meta verify token:** set `META_WEBHOOK_VERIFY_TOKEN` in `.env.local` (must match Meta dashboard). You may also set `META_VERIFY_TOKEN` to the same value — the app accepts either for the GET verify handshake. Per-seller WhatsApp API tokens live on the `sellers` row, not in env (see `.env.example`).
+
+**Push:** set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `PUSH_INTERNAL_SECRET` in Vercel for Web Push. **Encryption:** set `PORTER_CREDENTIAL_SECRET` (32+ char random) before using “encrypt at rest” on payment fields.

@@ -4,11 +4,16 @@ import { sendMessage } from "@/lib/meta-whatsapp";
 import { createPaymentLink } from "@/lib/razorpay";
 import { fuzzyMatchProducts } from "@/lib/fuzzy";
 import { isProductListedForBot } from "@/lib/product-catalog";
+import { checkGate } from "@/lib/plan-gates";
+import { getRazorpayKeysForSeller, getUpiForSeller } from "@/lib/seller-credentials";
+import { insertOrderEvent } from "@/lib/order-events";
 import type {
+  BotLanguagePreference,
   Conversation,
   ConversationContext,
   FullOrderParse,
   MessageIntent,
+  Order,
   OrderStatus,
   ParsedLineItem,
   PaymentMethod,
@@ -17,6 +22,60 @@ import type {
   Seller,
 } from "@/types";
 import Fuse from "fuse.js";
+import {
+  firstWelcomeBody,
+  formatOrderConfirmedCod,
+  formatOrderConfirmedPrepaid,
+  formatOrderConfirmedUpiManual,
+  formatOrderSummaryPrompt,
+  formatPartialPaymentPrompt,
+  formatSameOrderPaymentPrompt,
+  normalizeBotLanguagePref,
+  replyLangForMessage,
+  t,
+  type ReplyLang,
+} from "@/lib/bot-locale";
+import { isSellerWithinWorkingHours } from "@/lib/working-hours";
+import { parseReferralHint } from "@/lib/referral";
+import { parseScheduledDeliveryHint } from "@/lib/scheduled-delivery";
+
+function geminiLangOpts(seller: Seller) {
+  return { botLanguage: normalizeBotLanguagePref(seller.bot_language) as BotLanguagePreference };
+}
+
+function effectiveReplyLang(seller: Seller, customerText: string, ctx: ConversationContext): ReplyLang {
+  const pref = normalizeBotLanguagePref(seller.bot_language);
+  if (pref === "gujarati" || pref === "hindi") return pref;
+  if (pref === "english") return "english";
+  const cached = ctx.detected_reply_lang;
+  if (cached === "gujarati" || cached === "hindi" || cached === "english") return cached;
+  return replyLangForMessage("auto", customerText);
+}
+
+function replyLangFromCtx(seller: Seller, ctx: ConversationContext): ReplyLang {
+  const d = ctx.detected_reply_lang;
+  if (d === "gujarati" || d === "hindi" || d === "english") return d;
+  return normalizeBotLanguagePref(seller.bot_language) === "gujarati"
+    ? "gujarati"
+    : normalizeBotLanguagePref(seller.bot_language) === "hindi"
+      ? "hindi"
+      : "english";
+}
+
+async function persistAutoDetectedLang(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  conversationId: string,
+  seller: Seller,
+  customerText: string,
+  ctx: ConversationContext
+): Promise<ConversationContext> {
+  if (normalizeBotLanguagePref(seller.bot_language) !== "auto") return ctx;
+  const detected = replyLangForMessage("auto", customerText);
+  if (ctx.detected_reply_lang === detected) return ctx;
+  const next = { ...ctx, detected_reply_lang: detected };
+  await supabase.from("conversations").update({ context: next }).eq("id", conversationId);
+  return next;
+}
 
 const SAME_ORDER_PHRASES = [
   "same as last time",
@@ -111,6 +170,21 @@ export async function handleIncomingCustomerMessage(
     .update({ nudge_count: 0, last_nudge_at: null })
     .eq("id", conversation.id);
 
+  let ctx: ConversationContext = (conversation.context as ConversationContext) ?? {};
+  ctx = await persistAutoDetectedLang(supabase, conversation.id, seller, text, ctx);
+
+  if (!isSellerWithinWorkingHours(seller) && conversation.state === "collecting_items") {
+    const lang = replyLangFromCtx(seller, ctx);
+    const custom = seller.off_hours_message?.trim();
+    const msg =
+      custom && custom.length > 0
+        ? custom
+        : t("off_hours_closed", lang, { store: seller.store_name });
+    await sendMessage(phone, msg, seller);
+    await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
+    return;
+  }
+
   const welcomeAlreadySent =
     conversation.state === "collecting_items" &&
     (await sendFirstContactWelcomeIfNeeded(
@@ -119,14 +193,14 @@ export async function handleIncomingCustomerMessage(
       phone,
       conversation,
       now,
-      options?.isFirstMessage === true
+      options?.isFirstMessage === true,
+      ctx,
+      text
     ));
-
-  const ctx: ConversationContext = (conversation.context as ConversationContext) ?? {};
 
   switch (conversation.state) {
     case "collecting_items":
-      await runCollectingItems(supabase, seller, conversation, phone, text, now, welcomeAlreadySent);
+      await runCollectingItems(supabase, seller, conversation, phone, text, now, welcomeAlreadySent, ctx);
       break;
     case "collecting_payment_method":
       await runCollectingPaymentMethod(supabase, seller, conversation, phone, text, now, ctx);
@@ -137,12 +211,26 @@ export async function handleIncomingCustomerMessage(
     case "collecting_address":
       await runCollectingAddress(supabase, seller, conversation, phone, text, now, ctx);
       break;
+    case "awaiting_upi_confirmation":
+      await runAwaitingUpiConfirmation(supabase, seller, conversation, phone, text, now, ctx);
+      break;
     case "awaiting_payment":
       await runAwaitingPayment(supabase, seller, conversation, phone, text, ctx);
       break;
     default:
       break;
   }
+}
+
+function formatWorkingHoursHint(h: Seller["working_hours"]): string {
+  if (!h || typeof h !== "object") return "";
+  const parts: string[] = [];
+  for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const) {
+    const x = h[d];
+    if (x?.open && x?.close) parts.push(`${d}: ${x.open}–${x.close}`);
+  }
+  if (!parts.length) return "";
+  return `\n\nHours:\n${parts.join("\n")}`;
 }
 
 /** First-contact welcome: custom `bot_intro_message` or default copy. Returns true if a message was sent. */
@@ -152,24 +240,16 @@ async function sendFirstContactWelcomeIfNeeded(
   phone: string,
   conversation: Conversation,
   now: string,
-  isFirstMessage: boolean
+  isFirstMessage: boolean,
+  ctx: ConversationContext,
+  customerText: string
 ): Promise<boolean> {
   if (!isFirstMessage) return false;
-  const custom = seller.bot_intro_message?.trim();
+  const custom = seller.plan === "growth" ? seller.bot_intro_message?.trim() : "";
   const zones = (seller.delivery_zones ?? []).filter(Boolean).join(" · ");
-  const defaultWelcome = `Kem cho! 👋 Welcome to ${seller.store_name} on Porter.
-
-I'm your order assistant. Here's how to order:
-
-📝 Just type your list:
-'5kg bataka, 2 litre tael, amul butter'
-
-I understand Gujarati, Hindi and English!
-
-Delivery areas: ${zones || "—"}
-Payment: Online (UPI/Card) or Cash on Delivery
-
-Send your list whenever you're ready 🛒`;
+  const lang = effectiveReplyLang(seller, customerText, ctx);
+  const defaultWelcome =
+    firstWelcomeBody(seller.store_name, zones || "—", lang) + formatWorkingHoursHint(seller.working_hours ?? null);
 
   const msg = custom && custom.length > 0 ? custom : defaultWelcome;
   await sendMessage(phone, msg, seller);
@@ -200,7 +280,8 @@ async function runCollectingItems(
   phone: string,
   text: string,
   now: string,
-  welcomeAlreadySent: boolean
+  welcomeAlreadySent: boolean,
+  ctx: ConversationContext
 ) {
   const { data: products } = await supabase.from("products").select("*").eq("seller_id", seller.id);
 
@@ -208,19 +289,19 @@ async function runCollectingItems(
   const zones = seller.delivery_zones ?? [];
 
   if (matchSameOrderShortcut(text)) {
-    const handled = await handleSameAsLastTime(supabase, seller, conversation, phone, now);
+    const handled = await handleSameAsLastTime(supabase, seller, conversation, phone, now, ctx);
     if (handled) return;
   }
 
   let fullParse: FullOrderParse | null = null;
   if (text.trim().length >= 8) {
-    fullParse = await parseFullOrder(text, list, zones);
+    fullParse = await parseFullOrder(text, list, zones, geminiLangOpts(seller));
   }
 
   if (fullParse && (fullParse.confidence === "full" || fullParse.confidence === "partial")) {
     const matched = matchFullOrderItemsToCatalog(fullParse, list);
     if (matched.length === 0) {
-      await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent);
+      await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
       return;
     }
     const total = round2(matched.reduce((s, i) => s + i.total_price, 0));
@@ -230,17 +311,18 @@ async function runCollectingItems(
       const addressRaw = fullParse.address?.trim() ?? "";
       const zoneMatch = zones.length ? matchZone(areaRaw, zones) : areaRaw || null;
       if (!zoneMatch || !addressRaw) {
-        await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent);
+        await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
         return;
       }
+      const pm = fullParse.paymentMethod;
       const paymentMethod: PaymentMethod | null =
-        fullParse.paymentMethod === "cod" ? "cod" : fullParse.paymentMethod === "razorpay" ? "razorpay" : null;
+        pm === "cod" ? "cod" : pm === "upi_manual" || pm === "razorpay" ? "upi_manual" : null;
       if (!paymentMethod) {
-        await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent);
+        await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
         return;
       }
       if (paymentMethod === "cod" && !seller.cod_enabled) {
-        await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent);
+        await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
         return;
       }
       await finalizeOrderFromContext(supabase, seller, conversation, phone, now, {
@@ -259,7 +341,7 @@ async function runCollectingItems(
     const addressRaw = fullParse.address?.trim() ?? "";
     const zoneMatch = zones.length ? matchZone(areaRaw, zones) : areaRaw || null;
     if (!zoneMatch || !addressRaw) {
-      await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent);
+      await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
       return;
     }
     const lines = matched.map((i) => `• ${i.product_name} — ${i.quantity} ${i.unit} × ₹${i.unit_price} = ₹${i.total_price}`);
@@ -268,6 +350,7 @@ async function runCollectingItems(
       .update({
         state: "collecting_payment_method",
         context: {
+          ...ctx,
           items: matched,
           order_total: total,
           area: zoneMatch,
@@ -276,13 +359,19 @@ async function runCollectingItems(
         last_message_at: now,
       })
       .eq("id", conversation.id);
-    const msg = `Got it!\n${lines.join("\n")}\n💰 Total: ₹${total}\n📍 ${zoneMatch} — ${addressRaw}\n\nHow to pay?\n1️⃣ Online (UPI/Card)\n2️⃣ Cash on Delivery`;
+    const msg = formatPartialPaymentPrompt(
+      replyLangFromCtx(seller, ctx),
+      lines.join("\n"),
+      total,
+      zoneMatch,
+      addressRaw
+    );
     await sendMessage(phone, msg, seller);
     return;
   }
 
   // items_only or null → fall through to classification + normal parse
-  await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent);
+  await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
 }
 
 async function continueNormalParse(
@@ -293,27 +382,54 @@ async function continueNormalParse(
   text: string,
   now: string,
   list: Product[],
-  welcomeAlreadySent: boolean
+  welcomeAlreadySent: boolean,
+  ctx: ConversationContext
 ) {
+  const lang = replyLangFromCtx(seller, ctx);
   if (text.trim().length < 60) {
-    const intent = await classifyIntent(text);
+    const intent = await classifyIntent(text, geminiLangOpts(seller));
     if (intent !== "order") {
-      await handleShortIntent(supabase, seller, conversation, phone, text, now, intent, welcomeAlreadySent);
+      await handleShortIntent(supabase, seller, conversation, phone, text, now, intent, welcomeAlreadySent, ctx);
       return;
     }
   }
 
-  const parsed = await parseOrderText(text, list);
+  const parsed = await parseOrderText(text, list, geminiLangOpts(seller));
   if (parsed.length === 0) {
-    await sendMessage(phone, "Samajyu nathi — ferthi tamari list moklo (Gujarati / Hindi / English).", seller);
+    await sendMessage(phone, t("parse_failed", lang), seller);
     await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
     return;
   }
 
+  for (const it of parsed) {
+    if (!it.product_id) continue;
+    const { data: prow } = await supabase.from("products").select("stock_quantity, in_stock, name").eq("id", it.product_id).maybeSingle();
+    if (!prow) continue;
+    const sq =
+      typeof (prow as { stock_quantity?: number }).stock_quantity === "number"
+        ? (prow as { stock_quantity: number }).stock_quantity
+        : (prow as { in_stock: boolean }).in_stock
+          ? 1
+          : 0;
+    if (it.quantity > sq) {
+      const oos = seller.bot_out_of_stock_message?.trim() || "Sorry, that item is out of stock right now.";
+      await sendMessage(phone, `${oos}\n${(prow as { name: string }).name}: requested ${it.quantity}, available ${sq}.`, seller);
+      await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
+      return;
+    }
+  }
   const total = round2(parsed.reduce((s, i) => s + i.total_price, 0));
   const lines = parsed.map(
     (i) => `• ${i.product_name} — ${i.quantity} ${i.unit} × ₹${i.unit_price} = ₹${i.total_price}`
   );
+
+  const scheduledIso = parseScheduledDeliveryHint(text);
+  const refCode =
+    seller.plan === "growth" ? parseReferralHint(text, seller.referral_code ?? undefined) : null;
+  const extraCtx = {
+    ...(scheduledIso ? { scheduled_for: scheduledIso } : {}),
+    ...(refCode ? { referral_code: refCode } : {}),
+  } satisfies Partial<ConversationContext>;
 
   if (!seller.cod_enabled) {
     const zones = seller.delivery_zones ?? [];
@@ -322,22 +438,28 @@ async function continueNormalParse(
       .from("conversations")
       .update({
         state: "collecting_area",
-        context: { items: parsed, order_total: total, payment_method: "razorpay" as PaymentMethod },
+        context: {
+          ...ctx,
+          items: parsed,
+          order_total: total,
+          payment_method: "upi_manual" as PaymentMethod,
+          ...extraCtx,
+        },
         last_message_at: now,
       })
       .eq("id", conversation.id);
-    const msg = `Got it! Here's your order:\n${lines.join("\n")}\n💰 Total: ₹${total}\n\nOnline payment only on this store.${zoneHint}\n\nTamaro area moklo.`;
+    const msg = formatOrderSummaryPrompt(lang, lines.join("\n"), total, zoneHint, false);
     await sendMessage(phone, msg, seller);
     return;
   }
 
-  const msg = `Got it! Here's your order:\n${lines.join("\n")}\n💰 Total: ₹${total}\n\nHow do you want to pay?\n1️⃣ Online (UPI/Card) — pay now\n2️⃣ Cash on Delivery — pay when it arrives\n\nReply 1 or 2`;
+  const msg = formatOrderSummaryPrompt(lang, lines.join("\n"), total, "", true);
 
   await supabase
     .from("conversations")
     .update({
       state: "collecting_payment_method",
-      context: { items: parsed, order_total: total },
+      context: { ...ctx, items: parsed, order_total: total, ...extraCtx },
       last_message_at: now,
     })
     .eq("id", conversation.id);
@@ -353,8 +475,10 @@ async function handleShortIntent(
   text: string,
   now: string,
   intent: MessageIntent,
-  welcomeAlreadySent: boolean
+  welcomeAlreadySent: boolean,
+  ctx: ConversationContext
 ) {
+  const lang = replyLangFromCtx(seller, ctx);
   if (intent === "greeting") {
     if (welcomeAlreadySent) {
       await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
@@ -367,25 +491,12 @@ async function handleShortIntent(
       .eq("customer_phone", phone);
     const prev = (count ?? 0) > 0;
     if (!prev) {
-      await sendMessage(
-        phone,
-        `Kem cho! 👋 Welcome to ${seller.store_name} on Porter.
-
-I'm your order assistant. Here's how to order:
-
-📝 Just type your list:
-'5kg bataka, 2 litre tael, amul butter'
-
-I understand Gujarati, Hindi and English!
-
-Delivery areas: ${(seller.delivery_zones ?? []).filter(Boolean).join(" · ") || "—"}
-Payment: Online (UPI/Card) or Cash on Delivery
-
-Send your list whenever you're ready 🛒`,
-        seller
-      );
+      const zones = (seller.delivery_zones ?? []).filter(Boolean).join(" · ");
+      const body =
+        firstWelcomeBody(seller.store_name, zones || "—", lang) + formatWorkingHoursHint(seller.working_hours ?? null);
+      await sendMessage(phone, body, seller);
     } else {
-      await sendMessage(phone, "Welcome back! 👋 Send me your list anytime — I'm ready. 🛒", seller);
+      await sendMessage(phone, t("welcome_repeat", lang), seller);
     }
     await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
     return;
@@ -393,13 +504,13 @@ Send your list whenever you're ready 🛒`,
 
   if (intent === "question") {
     const phoneLine = seller.whatsapp_number
-      ? `\nOr call the shop directly: ${seller.whatsapp_number}`
+      ? lang === "gujarati"
+        ? `\nઅથવા દુકાન પર કૉલ કરો: ${seller.whatsapp_number}`
+        : lang === "hindi"
+          ? `\nया दुकान पर कॉल करें: ${seller.whatsapp_number}`
+          : `\nOr call the shop directly: ${seller.whatsapp_number}`
       : "";
-    await sendMessage(
-      phone,
-      `Hi! For pricing and availability, just send me the item name and I'll check.${phoneLine}\nTo place an order, just send your list! 🛒`,
-      seller
-    );
+    await sendMessage(phone, t("question_reply", lang, { phoneLine }), seller);
     await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
     return;
   }
@@ -407,9 +518,7 @@ Send your list whenever you're ready 🛒`,
   if (intent === "other") {
     await sendMessage(
       phone,
-      `Hi! I'm the order bot for ${seller.store_name}. 🤖
-Send me your grocery list to place an order.
-Example: '5kg aloo, amul butter, 2L tael'`,
+      t("other_reply", lang, { store: seller.store_name }),
       seller
     );
     await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
@@ -445,8 +554,10 @@ async function handleSameAsLastTime(
   seller: Seller,
   conversation: Conversation,
   phone: string,
-  now: string
+  now: string,
+  ctx: ConversationContext
 ): Promise<boolean> {
+  const lang = replyLangFromCtx(seller, ctx);
   const { data: lastOrder } = await supabase
     .from("orders")
     .select("id")
@@ -458,7 +569,7 @@ async function handleSameAsLastTime(
     .maybeSingle();
 
   if (!lastOrder?.id) {
-    await sendMessage(phone, "I don't have a previous order for you. Send me your list!", seller);
+    await sendMessage(phone, t("same_order_missing", lang), seller);
     await supabase.from("conversations").update({ last_message_at: now }).eq("id", conversation.id);
     return true;
   }
@@ -494,6 +605,7 @@ async function handleSameAsLastTime(
       .update({
         state: "collecting_payment_method",
         context: {
+          ...ctx,
           items: parsed,
           order_total: total,
           area: zoneMatch,
@@ -504,7 +616,7 @@ async function handleSameAsLastTime(
       .eq("id", conversation.id);
     await sendMessage(
       phone,
-      `Same order loaded!\n${lines.join("\n")}\n💰 Total: ₹${total}\n📍 ${zoneMatch} — ${address}\n\nHow to pay?\n1️⃣ Online (UPI/Card)\n2️⃣ Cash on Delivery`,
+      formatSameOrderPaymentPrompt(lang, lines.join("\n"), total, zoneMatch, address),
       seller
     );
     return true;
@@ -514,13 +626,67 @@ async function handleSameAsLastTime(
     .from("conversations")
     .update({
       state: "collecting_area",
-      context: { items: parsed, order_total: total },
+      context: { ...ctx, items: parsed, order_total: total },
       last_message_at: now,
     })
     .eq("id", conversation.id);
   const zoneHint = zones.length ? `\n\nDelivery areas: ${zones.join(", ")}` : "";
-  await sendMessage(phone, `Here's your last order:\n${lines.join("\n")}\n💰 Total: ₹${total}${zoneHint}\n\nTamaro area moklo.`, seller);
+  const zonePrompt =
+    lang === "gujarati"
+      ? `\n\nતમારો એરિયા મોકલો.${zoneHint}`
+      : lang === "hindi"
+        ? `\n\nअपना एरिया भेजें.${zoneHint}`
+        : `\n\nSend your area.${zoneHint}`;
+  await sendMessage(
+    phone,
+    `${lang === "gujarati" ? "તમારો છેલ્લો ઓર્ડર:" : lang === "hindi" ? "आपका पिछला ऑर्डर:" : "Here's your last order:"}\n${lines.join("\n")}\n💰 Total: ₹${total}${zonePrompt}`,
+    seller
+  );
   return true;
+}
+
+async function adjustProductStockAfterOrder(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  items: ParsedLineItem[]
+) {
+  for (const it of items) {
+    if (!it.product_id) continue;
+    const { data: row } = await supabase.from("products").select("stock_quantity, in_stock").eq("id", it.product_id).maybeSingle();
+    if (!row) continue;
+    const prev = (row as { stock_quantity?: number; in_stock: boolean }).stock_quantity;
+    const sq = typeof prev === "number" ? prev : row.in_stock ? 1 : 0;
+    const next = Math.max(0, sq - it.quantity);
+    await supabase
+      .from("products")
+      .update({
+        stock_quantity: next,
+        in_stock: next > 0,
+        is_active: next > 0,
+      })
+      .eq("id", it.product_id);
+  }
+}
+
+function trackOrderAppend(order: Order): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const slug = (order as { track_public_slug?: string | null }).track_public_slug;
+  if (!base || !slug) return "";
+  return `\n\nTrack: ${base}/track/${slug}`;
+}
+
+async function notifyOrderPush(sellerId: string, title: string, body: string) {
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const secret = process.env.PUSH_INTERNAL_SECRET;
+  if (!base || !secret) return;
+  try {
+    await fetch(`${base}/api/push/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-porter-push-secret": secret },
+      body: JSON.stringify({ seller_id: sellerId, title, body }),
+    });
+  } catch (e) {
+    console.error("[conversation] push notify", e);
+  }
 }
 
 async function finalizeOrderFromContext(
@@ -531,14 +697,56 @@ async function finalizeOrderFromContext(
   now: string,
   ctx: ConversationContext & { notes?: string }
 ) {
+  const lang = replyLangFromCtx(seller, ctx);
   const items = ctx.items ?? [];
-  const paymentMethod = ctx.payment_method ?? "razorpay";
+  let paymentMethod: PaymentMethod = ctx.payment_method ?? "upi_manual";
   const area = ctx.area ?? "";
   const address = (ctx.address ?? "").trim();
   const total = ctx.order_total ?? round2(items.reduce((s, i) => s + i.total_price, 0));
 
-  if (paymentMethod === "razorpay" && (!seller.razorpay_key_id || !seller.razorpay_key_secret)) {
-    await sendMessage(phone, "Online payment setup pending on store side. Store ne call karo.", seller);
+  const upi = getUpiForSeller(seller);
+  const rzp = getRazorpayKeysForSeller(seller);
+
+  if (paymentMethod === "razorpay" && !rzp) {
+    paymentMethod = upi ? "upi_manual" : paymentMethod;
+  }
+
+  if (paymentMethod === "upi_manual" && !upi) {
+    await sendMessage(phone, t("upi_not_configured", lang), seller);
+    return;
+  }
+
+  if (paymentMethod === "cod" && !seller.cod_enabled) {
+    await sendMessage(phone, t("cod_disabled", lang), seller);
+    return;
+  }
+
+  const minOrder = seller.min_order_amount != null ? Number(seller.min_order_amount) : null;
+  if (minOrder != null && Number.isFinite(minOrder) && minOrder > 0 && total < minOrder) {
+    await sendMessage(
+      phone,
+      t("min_order_not_met", lang, { min: String(minOrder), total: String(total) }),
+      seller
+    );
+    return;
+  }
+
+  if (paymentMethod === "razorpay" && !rzp) {
+    await sendMessage(phone, t("online_pending", lang), seller);
+    return;
+  }
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const { count: monthOrders } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("seller_id", seller.id)
+    .gte("created_at", startOfMonth.toISOString());
+  const gate = checkGate(seller, "orders_monthly", { ordersThisMonth: (monthOrders ?? 0) + 1 });
+  if (!gate.ok) {
+    await sendMessage(phone, `${t("monthly_order_cap", lang)} ${gate.reason}`, seller);
     return;
   }
 
@@ -550,6 +758,7 @@ async function finalizeOrderFromContext(
         phone_number: phone,
         default_area: area,
         default_address: address,
+        ...(ctx.referral_code ? { referred_by_code: ctx.referral_code } : {}),
       },
       { onConflict: "seller_id,phone_number" }
     )
@@ -557,6 +766,14 @@ async function finalizeOrderFromContext(
     .single();
 
   const customerId = cust?.id as string | undefined;
+
+  if (ctx.referral_code && customerId) {
+    await supabase
+      .from("customers")
+      .update({ referred_by_code: ctx.referral_code })
+      .eq("id", customerId)
+      .is("referred_by_code", null);
+  }
 
   const paymentStatus: PaymentStatus = paymentMethod === "cod" ? "cod_pending" : "unpaid";
   const orderStatus: OrderStatus = paymentMethod === "cod" ? "confirmed" : "pending";
@@ -574,17 +791,28 @@ async function finalizeOrderFromContext(
     payment_status: paymentStatus,
   };
   if (ctx.notes) insertPayload.notes = ctx.notes;
+  if (ctx.scheduled_for) insertPayload.scheduled_for = ctx.scheduled_for;
 
   const { data: order, error: orderErr } = await supabase.from("orders").insert(insertPayload).select("*").single();
 
   if (orderErr || !order) {
     console.error("[conversation] order insert", orderErr);
-    await sendMessage(phone, "Order save ma problem aavi. Ferthi try karo.", seller);
+    await sendMessage(phone, t("order_save_failed", lang), seller);
     return;
   }
 
+  await insertOrderEvent(supabase, {
+    orderId: order.id,
+    sellerId: seller.id,
+    eventType: "order_created",
+    status: order.status,
+    paymentStatus: order.payment_status ?? undefined,
+    source: "bot",
+  });
+
   const orderItems = items.map((i) => ({
     order_id: order.id,
+    seller_id: seller.id,
     product_id: i.product_id,
     product_name: i.product_name,
     quantity: i.quantity,
@@ -593,6 +821,7 @@ async function finalizeOrderFromContext(
     total_price: i.total_price,
   }));
   await supabase.from("order_items").insert(orderItems);
+  await adjustProductStockAfterOrder(supabase, items);
 
   if (customerId) {
     const { data: c } = await supabase.from("customers").select("order_count").eq("id", customerId).single();
@@ -603,12 +832,22 @@ async function finalizeOrderFromContext(
   const summaryLines = items.map((i) => `• ${i.product_name} — ${i.quantity} ${i.unit} — ₹${i.total_price}`);
   const summary = summaryLines.join("\n");
 
-  if (paymentMethod === "razorpay") {
+  const tpl = seller.bot_order_confirmation_template?.trim();
+  function formatConfirm(extra: string) {
+    if (!tpl) return extra;
+    return tpl
+      .replace(/\{\{summary\}\}/g, summary)
+      .replace(/\{\{total\}\}/g, String(total))
+      .replace(/\{\{store\}\}/g, seller.store_name)
+      .replace(/\{\{id\}\}/g, order.id.slice(0, 8));
+  }
+
+  if (paymentMethod === "razorpay" && rzp) {
     const link = await createPaymentLink({
       amountPaise: Math.round(total * 100),
       order: order,
-      keyId: seller.razorpay_key_id!,
-      keySecret: seller.razorpay_key_secret!,
+      keyId: rzp.keyId,
+      keySecret: rzp.keySecret,
       callbackUrl: process.env.NEXT_PUBLIC_APP_URL
         ? `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
         : undefined,
@@ -621,7 +860,7 @@ async function finalizeOrderFromContext(
         const oc = Math.max(0, ((c?.order_count as number) ?? 1) - 1);
         await supabase.from("customers").update({ order_count: oc }).eq("id", customerId);
       }
-      await sendMessage(phone, "Payment link banavi shakyu nathi. Ferthi try karo.", seller);
+      await sendMessage(phone, t("payment_link_failed", lang), seller);
       return;
     }
     await supabase
@@ -641,8 +880,33 @@ async function finalizeOrderFromContext(
       })
       .eq("id", conversation.id);
 
-    const msg = `✅ Order confirmed!\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\n${link.short_url}\n\n*Porter — ${seller.store_name}*`;
+    const msg = formatConfirm(
+      `${formatOrderConfirmedPrepaid(lang, summary, area, address, total, link.short_url, seller.store_name)}${trackOrderAppend(order)}`
+    );
     await sendMessage(phone, msg, seller);
+    return;
+  }
+
+  if (paymentMethod === "upi_manual" && upi) {
+    await supabase
+      .from("conversations")
+      .update({
+        state: "awaiting_upi_confirmation",
+        context: { ...ctx, address, order_id: order.id },
+        last_message_at: now,
+      })
+      .eq("id", conversation.id);
+
+    const shortId = order.id.slice(0, 8);
+    const msg = formatConfirm(
+      `${formatOrderConfirmedUpiManual(lang, summary, area, address, total, upi, shortId, seller.store_name)}\n\n${t(
+        "awaiting_upi_instructions",
+        lang,
+        { amount: String(total), upi, shortId }
+      )}${trackOrderAppend(order)}`
+    );
+    await sendMessage(phone, msg, seller);
+    void notifyOrderPush(seller.id, "New order — UPI pending", `₹${total} — ${shortId}`);
     return;
   }
 
@@ -655,8 +919,9 @@ async function finalizeOrderFromContext(
     })
     .eq("id", conversation.id);
 
-  const codMsg = `✅ Order confirmed!\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\nCash on delivery — pay rider ₹${total}\n\n*Porter — ${seller.store_name}*`;
+  const codMsg = formatConfirm(`${formatOrderConfirmedCod(lang, summary, area, address, total, seller.store_name)}${trackOrderAppend(order)}`);
   await sendMessage(phone, codMsg, seller);
+  void notifyOrderPush(seller.id, "New order", `₹${total} — ${order.id.slice(0, 8)}`);
 }
 
 /** Records prepaid vs COD and asks for delivery area. */
@@ -669,21 +934,41 @@ async function runCollectingPaymentMethod(
   now: string,
   ctx: ConversationContext
 ) {
-  const t = text.trim().toLowerCase();
+  const lang = replyLangFromCtx(seller, ctx);
+  const txt = text.trim().toLowerCase();
   let method: PaymentMethod | null = null;
-  if (t === "1" || t.includes("online") || t.includes("upi") || t.includes("card") || t.includes("prepaid")) {
-    method = "razorpay";
-  } else if (t === "2" || t.includes("cod") || t.includes("cash")) {
+  const upiAvail = getUpiForSeller(seller);
+  const rzpKeys = getRazorpayKeysForSeller(seller);
+
+  if (txt === "1" || txt.includes("upi") || txt.includes("prepaid") || txt.includes("online") || txt.includes("card")) {
+    if (upiAvail) method = "upi_manual";
+    else if (rzpKeys) method = "razorpay";
+    else if (seller.cod_enabled) {
+      await sendMessage(
+        phone,
+        lang === "gujarati"
+          ? "UPI સેટ નથી — કૅશ માટે 2 લખો."
+          : lang === "hindi"
+            ? "UPI सेट नहीं — COD के लिए 2 भेजें।"
+            : "UPI isn't configured — reply 2 for cash on delivery.",
+        seller
+      );
+      return;
+    } else {
+      await sendMessage(phone, t("upi_not_configured", lang), seller);
+      return;
+    }
+  } else if (txt === "2" || txt.includes("cod") || txt.includes("cash")) {
     method = "cod";
   }
 
   if (method === "cod" && !seller.cod_enabled) {
-    await sendMessage(phone, "COD aa store par available nathi. Reply 1 for online payment.", seller);
+    await sendMessage(phone, t("cod_disabled", lang), seller);
     return;
   }
 
   if (!method) {
-    await sendMessage(phone, "Reply 1 for online payment, 2 for Cash on Delivery.", seller);
+    await sendMessage(phone, t("pick_payment", lang), seller);
     return;
   }
 
@@ -711,7 +996,7 @@ async function runCollectingPaymentMethod(
     })
     .eq("id", conversation.id);
 
-  await sendMessage(phone, `Tamaro area moklo (building / society naam optional).${zoneHint}`, seller);
+  await sendMessage(phone, t("area_prompt", lang, { zoneHint }), seller);
 }
 
 /** Matches customer area to configured delivery zones or asks again. */
@@ -724,12 +1009,26 @@ async function runCollectingArea(
   now: string,
   ctx: ConversationContext
 ) {
+  const lang = replyLangFromCtx(seller, ctx);
   const zones = seller.delivery_zones ?? [];
   const match = matchZone(text, zones);
   if (!match) {
     await sendMessage(
       phone,
-      zones.length > 0 ? `Area match nathi thayu. Valid zones: ${zones.join(", ")}` : "Area samajyu nathi — ferthi moklo.",
+      t("area_invalid", lang, {
+        detail:
+          zones.length > 0
+            ? lang === "gujarati"
+              ? `માન્ય ઝોન: ${zones.join(", ")}`
+              : lang === "hindi"
+                ? `वैध ज़ोन: ${zones.join(", ")}`
+                : `Valid zones: ${zones.join(", ")}`
+            : lang === "gujarati"
+              ? "ફરી મોકલો."
+              : lang === "hindi"
+                ? "फिर भेजें."
+                : "Try again.",
+      }),
       seller
     );
     return;
@@ -744,7 +1043,7 @@ async function runCollectingArea(
     })
     .eq("id", conversation.id);
 
-  await sendMessage(phone, `Got it — ${match}. Please send your full address (building + flat number).`, seller);
+  await sendMessage(phone, t("address_prompt", lang, { area: match }), seller);
 }
 
 /** Persists order (+ payment link for prepaid), then completes or awaits payment. */
@@ -764,6 +1063,104 @@ async function runCollectingAddress(
   });
 }
 
+/** Customer replied while waiting for manual UPI confirmation. */
+async function runAwaitingUpiConfirmation(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  seller: Seller,
+  conversation: Conversation,
+  phone: string,
+  text: string,
+  now: string,
+  ctx: ConversationContext
+) {
+  const lang = replyLangFromCtx(seller, ctx);
+  const raw = text.trim();
+  const lower = raw.toLowerCase();
+  const paidLike =
+    /\bpaid\b/i.test(lower) ||
+    /\butr\b/i.test(lower) ||
+    /\butr[:#\s]/i.test(lower) ||
+    /^done$/i.test(lower) ||
+    /^pay\s*kar\s*diya/i.test(lower) ||
+    /^pay\s*kar\s*didi/i.test(lower) ||
+    /^ચૂકવણી\s*થઈ/i.test(raw) ||
+    /^भुगतान\s*कर\s*दिया/i.test(lower);
+
+  if (!paidLike) {
+    const orderId = ctx.order_id;
+    if (!orderId) {
+      await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+      return;
+    }
+    const { data: order } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+    const upi = getUpiForSeller(seller);
+    if (!order || order.payment_method !== "upi_manual" || !upi) {
+      await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+      return;
+    }
+    const amt = order.total_amount ?? 0;
+    const shortId = order.id.slice(0, 8);
+    await sendMessage(
+      phone,
+      t("awaiting_upi_instructions", lang, {
+        amount: String(amt),
+        upi,
+        shortId,
+      }),
+      seller
+    );
+    return;
+  }
+
+  const orderId = ctx.order_id;
+  if (!orderId) {
+    await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+    return;
+  }
+
+  const { data: orderRow } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+  const order = orderRow as Order | null;
+  if (!order || order.seller_id !== seller.id || order.payment_method !== "upi_manual") {
+    await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+    return;
+  }
+
+  await supabase
+    .from("orders")
+    .update({
+      payment_status: "paid",
+      paid_at: now,
+      status: "preparing",
+    })
+    .eq("id", order.id);
+
+  await insertOrderEvent(supabase, {
+    orderId: order.id,
+    sellerId: seller.id,
+    eventType: "customer_claimed_upi_paid",
+    status: "preparing",
+    paymentStatus: "paid",
+    note: raw.slice(0, 500),
+    source: "bot",
+  });
+
+  await supabase
+    .from("conversations")
+    .update({
+      state: "complete",
+      context: { ...ctx, order_id: order.id },
+      last_message_at: now,
+    })
+    .eq("id", conversation.id);
+
+  await sendMessage(phone, t("paid_ack_customer", lang), seller);
+  void notifyOrderPush(
+    seller.id,
+    "Customer says paid (UPI)",
+    `₹${order.total_amount ?? "?"} — ${order.id.slice(0, 8)}`
+  );
+}
+
 /** Resends Razorpay link when customer messages again before paying. */
 async function runAwaitingPayment(
   supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
@@ -774,17 +1171,25 @@ async function runAwaitingPayment(
   ctx: ConversationContext
 ) {
   void conversation;
+  const lang = replyLangFromCtx(seller, ctx);
   const orderId = ctx.order_id;
   if (!orderId) {
-    await sendMessage(phone, "Order details nathi malya. Ferthi list moklo.", seller);
+    await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
     return;
   }
   const { data: order } = await supabase.from("orders").select("*").eq("id", orderId).single();
   if (!order?.razorpay_payment_link_url) {
-    await sendMessage(phone, "Payment link nathi. Store ne contact karo.", seller);
+    await sendMessage(phone, t("awaiting_payment_no_link", lang), seller);
     return;
   }
-  await sendMessage(phone, `Pay ₹${order.total_amount} here 👇\n${order.razorpay_payment_link_url}`, seller);
+  await sendMessage(
+    phone,
+    t("payment_reminder", lang, {
+      amount: String(order.total_amount ?? ""),
+      url: order.razorpay_payment_link_url,
+    }),
+    seller
+  );
 }
 
 /** Fuzzy-picks a delivery zone from the seller's zone list. */

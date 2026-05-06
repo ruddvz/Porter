@@ -34,7 +34,7 @@ export function fuzzyMatchProducts(text: string, products: Product[]): FuzzyMatc
 
 export { THRESHOLD as FUZZY_CONFIDENCE_THRESHOLD };
 
-/** Client-side search: substring on name/aliases/category/description + Fuse on full product names. */
+/** Client-side search: substring on name/aliases/category/description + Fuse on key fields. */
 export function filterProductsByFuzzySearch(products: Product[], query: string): Product[] {
   const q = query.trim().toLowerCase();
   if (!q) return products;

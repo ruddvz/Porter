@@ -5,18 +5,35 @@ import { formatCurrencyInr, orderStatusBadge, paymentBadge } from "@/lib/orders-
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import type { Order } from "@/types";
-import { Copy, GripHorizontal, MapPin, Printer, X } from "lucide-react";
+import type { Order, Seller } from "@/types";
+import { Copy, GripHorizontal, MapPin, MessageCircle, Printer, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function waMeLink(phone: string, text: string) {
+  const digits = phone.replace(/\D/g, "");
+  const n = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+
 export default function OrderDetailPanel({
+  seller,
   order,
   onClose,
   onSaved,
   onOrderUpdate,
 }: {
+  seller: Pick<Seller, "id" | "store_name" | "delivery_fee" | "city">;
   order: OrderWithItems | null;
   onClose: () => void;
   onSaved: () => void;
@@ -24,17 +41,95 @@ export default function OrderDetailPanel({
 }) {
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
+  const o = order;
   const [note, setNote] = useState(order?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+
+  const [events, setEvents] = useState<{ event_type: string; note: string | null; created_at: string }[]>([]);
+  const [riderLabel, setRiderLabel] = useState(o?.rider_label ?? "");
 
   useEffect(() => {
     setNote(order?.notes ?? "");
   }, [order?.id, order?.notes]);
 
-  const o = order;
+  useEffect(() => {
+    setRiderLabel(o?.rider_label ?? "");
+  }, [o?.id, o?.rider_label]);
+
+  useEffect(() => {
+    if (!o?.id || !seller.id) {
+      setEvents([]);
+      return;
+    }
+    void supabase
+      .from("order_events")
+      .select("event_type, note, created_at")
+      .eq("order_id", o.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) =>
+        setEvents((data as { event_type: string; note: string | null; created_at: string }[]) ?? [])
+      );
+  }, [o?.id, seller.id, supabase]);
   const statusBadge = useMemo(() => (o ? orderStatusBadge(o.status) : null), [o]);
   const pay = useMemo(() => (o ? paymentBadge(o) : null), [o]);
+
+  const markPaidUpi = useCallback(async () => {
+    if (!o) return;
+    setBusy(true);
+    const prev = { ...o };
+    const updates = {
+      payment_status: "paid" as const,
+      paid_at: new Date().toISOString(),
+      status: "preparing" as const,
+    };
+    onOrderUpdate?.({ ...o, ...updates });
+    const { error } = await supabase.from("orders").update(updates).eq("id", o.id);
+    if (!error) {
+      await supabase.from("order_events").insert({
+        order_id: o.id,
+        seller_id: seller.id,
+        event_type: "payment_confirmed_dashboard",
+        status: "preparing",
+        payment_status: "paid",
+        source: "dashboard",
+      });
+    }
+    setBusy(false);
+    if (error) {
+      onOrderUpdate?.(prev);
+      toast(error.message, "error");
+    } else {
+      toast("Marked paid", "success");
+      void supabase
+        .from("order_events")
+        .select("event_type, note, created_at")
+        .eq("order_id", o.id)
+        .order("created_at", { ascending: true })
+        .then(({ data }) =>
+          setEvents((data as { event_type: string; note: string | null; created_at: string }[]) ?? [])
+        );
+      onSaved();
+    }
+  }, [o, onOrderUpdate, onSaved, seller.id, supabase, toast]);
+
+  const saveRider = useCallback(async () => {
+    if (!o) return;
+    setBusy(true);
+    const prev = o.rider_label;
+    onOrderUpdate?.({ ...o, rider_label: riderLabel.trim() || null });
+    const { error } = await supabase
+      .from("orders")
+      .update({ rider_label: riderLabel.trim() || null })
+      .eq("id", o.id);
+    setBusy(false);
+    if (error) {
+      onOrderUpdate?.({ ...o, rider_label: prev });
+      toast(error.message, "error");
+    } else {
+      toast("Rider label saved", "success");
+    }
+  }, [o, onOrderUpdate, riderLabel, supabase, toast]);
 
   const markCodCollected = useCallback(async () => {
     if (!o) return;
@@ -89,21 +184,46 @@ export default function OrderDetailPanel({
     if (!o) return;
     const w = window.open("", "_blank");
     if (!w) return;
-    const lines =
-      o.order_items?.map((i) => `${i.product_name}\t${i.quantity}\t${i.unit}\t₹${i.unit_price}\t₹${i.total_price}`) ?? [];
-    w.document.write(`<pre style="font-family:system-ui;padding:16px">${[
-      `Order ${o.id.slice(0, 8)}`,
-      `${o.customer_name || ""} ${o.customer_phone}`,
-      `${o.delivery_area || ""} ${o.delivery_address || ""}`,
-      "",
-      ...lines,
-      "",
-      `Total ₹${o.total_amount}`,
-    ].join("\n")}</pre>`);
+    const fee = seller.delivery_fee != null ? Number(seller.delivery_fee) : 0;
+    const sub = Number(o.total_amount ?? 0);
+    const grand = sub + (Number.isFinite(fee) ? fee : 0);
+    const rows =
+      o.order_items?.map(
+        (i) =>
+          `<tr><td>${escapeHtml(i.product_name)}</td><td class="num">${i.quantity} ${escapeHtml(i.unit)}</td><td class="num">₹${Number(i.unit_price).toFixed(2)}</td><td class="num">₹${Number(i.total_price).toFixed(2)}</td></tr>`,
+      ) ?? [];
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt ${escapeHtml(o.id.slice(0, 8))}</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;padding:24px;max-width:480px;margin:0 auto;color:#111}
+  h1{font-size:1.25rem;margin:0 0 4px}
+  .muted{color:#555;font-size:12px}
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+  th{text-align:left;border-bottom:1px solid #ddd;padding:8px 4px}
+  td{padding:8px 4px;border-bottom:1px solid #eee}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .tot{margin-top:16px;font-size:15px}
+  .grand{font-weight:700;font-size:18px;margin-top:8px}
+  @media print{body{padding:12px}}
+</style></head><body>
+  <h1>${escapeHtml(seller.store_name)}</h1>
+  <p class="muted">${seller.city ? escapeHtml(seller.city) + " · " : ""}Order #${escapeHtml(o.id.slice(0, 8))}</p>
+  <p class="muted">${new Date(o.created_at).toLocaleString()}</p>
+  <p><strong>${escapeHtml(o.customer_name || "Customer")}</strong><br/><span class="muted">${escapeHtml(o.customer_phone)}</span></p>
+  <p class="muted">${escapeHtml(o.delivery_area || "")} ${escapeHtml(o.delivery_address || "")}</p>
+  <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Line</th></tr></thead><tbody>
+  ${rows.join("")}
+  </tbody></table>
+  <div class="tot">Subtotal <span style="float:right">₹${sub.toFixed(2)}</span></div>
+  ${fee > 0 ? `<div class="tot">Delivery <span style="float:right">₹${fee.toFixed(2)}</span></div>` : ""}
+  <div class="grand">Total <span style="float:right">₹${grand.toFixed(2)}</span></div>
+  <p class="muted" style="margin-top:24px">Thank you for your order.</p>
+</body></html>`;
+    w.document.write(html);
     w.document.close();
+    w.focus();
     w.print();
     w.close();
-  }, [o]);
+  }, [o, seller]);
 
   if (!o) return null;
 
@@ -157,6 +277,24 @@ export default function OrderDetailPanel({
                 {o.delivery_address || "—"}
               </span>
             </p>
+            {o.scheduled_for ? (
+              <p className="mt-2 text-sm text-amber-200/90">Requested for: {new Date(o.scheduled_for).toLocaleString()}</p>
+            ) : null}
+          </section>
+
+          <section className="mt-6">
+            <h3 className="text-label text-porter-text-muted">Rider / delivery</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Input.Text
+                id="rider"
+                label="Rider or vehicle note"
+                className="min-w-[200px] flex-1"
+                value={riderLabel}
+                onChange={(e) => setRiderLabel(e.target.value)}
+                onBlur={() => void saveRider()}
+                placeholder="e.g. Blue Activa / Ravi bhai"
+              />
+            </div>
           </section>
 
           <section className="mt-6">
@@ -276,6 +414,23 @@ export default function OrderDetailPanel({
           </section>
 
           <section className="mt-6">
+            <h3 className="text-label text-porter-text-muted">Activity</h3>
+            {events.length === 0 ? (
+              <p className="mt-2 text-sm text-porter-text-muted">No payment or status events logged yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2 border-l border-porter-bg-border pl-4">
+                {events.map((ev) => (
+                  <li key={`${ev.event_type}-${ev.created_at}`} className="text-sm">
+                    <span className="font-medium text-porter-text-primary">{ev.event_type.replace(/_/g, " ")}</span>
+                    <span className="text-mono text-xs text-porter-text-muted"> · {new Date(ev.created_at).toLocaleString()}</span>
+                    {ev.note ? <p className="mt-0.5 text-porter-text-secondary">{ev.note}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-6">
             <h3 className="text-label text-porter-text-muted">Notes</h3>
             <textarea
               value={note}
@@ -294,6 +449,26 @@ export default function OrderDetailPanel({
                 Mark cash collected
               </Button>
             )}
+            {o.payment_method === "upi_manual" && o.payment_status === "unpaid" && o.status === "pending" && (
+              <Button type="button" variant="primary" size="sm" loading={busy} onClick={() => void markPaidUpi()}>
+                Confirm UPI received
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                window.open(
+                  waMeLink(o.customer_phone, `Hi${o.customer_name ? ` ${o.customer_name}` : ""}, regarding order #${o.id.slice(0, 8)} — `),
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+            >
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </Button>
             <Button type="button" variant="secondary" size="sm" onClick={printOrder}>
               <Printer className="h-4 w-4" />
               Print

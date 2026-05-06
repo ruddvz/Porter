@@ -8,7 +8,7 @@ export default async function InventoryPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
-  const { data: seller } = await supabase.from("sellers").select("id").eq("user_id", user.id).maybeSingle();
+  const { data: seller } = await supabase.from("sellers").select("*").eq("user_id", user.id).maybeSingle();
   if (!seller) redirect("/onboarding");
 
   const { data: products } = await supabase
@@ -17,5 +17,5 @@ export default async function InventoryPage() {
     .eq("seller_id", seller.id)
     .order("created_at", { ascending: false });
 
-  return <InventoryClient initialProducts={products ?? []} />;
+  return <InventoryClient seller={seller} initialProducts={products ?? []} />;
 }

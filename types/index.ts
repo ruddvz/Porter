@@ -26,10 +26,14 @@ export type ConversationState =
   | "collecting_area"
   | "collecting_address"
   | "awaiting_payment"
+  | "awaiting_upi_confirmation"
   | "complete"
   | "failed";
 
 export type BotLanguagePreference = "auto" | "gujarati" | "hindi" | "english";
+
+/** Per-day hours: { "mon": { open: "09:00", close: "21:00" }, ... } */
+export type WorkingHoursMap = Record<string, { open: string; close: string } | null | undefined>;
 
 export interface Seller {
   id: string;
@@ -38,6 +42,14 @@ export interface Seller {
   whatsapp_number: string;
   city: string | null;
   delivery_zones: string[] | null;
+  /** IANA timezone for working-hours checks (default Asia/Kolkata in code). */
+  timezone?: string | null;
+  /** Minimum order amount (₹) before checkout — optional. */
+  min_order_amount?: number | null;
+  /** Flat delivery fee (₹) shown on receipt — optional. */
+  delivery_fee?: number | null;
+  /** Reply when customer writes outside working hours. */
+  off_hours_message?: string | null;
   upi_id: string | null;
   razorpay_key_id: string | null;
   razorpay_key_secret: string | null;
@@ -46,10 +58,23 @@ export interface Seller {
   created_at: string;
   meta_phone_number_id: string | null;
   meta_access_token: string | null;
+  meta_access_token_enc?: string | null;
   cod_enabled: boolean;
   bot_intro_message?: string | null;
   bot_language?: BotLanguagePreference | string | null;
   razorpay_test_mode?: boolean | null;
+  store_description?: string | null;
+  logo_url?: string | null;
+  bot_out_of_stock_message?: string | null;
+  bot_order_confirmation_template?: string | null;
+  working_hours?: WorkingHoursMap | null;
+  upi_id_enc?: string | null;
+  razorpay_key_id_enc?: string | null;
+  razorpay_key_secret_enc?: string | null;
+  /** Award ₹1 loyalty point per ₹ of delivered orders when enabled (Growth). */
+  loyalty_points_enabled?: boolean | null;
+  /** Optional referral code for Growth stores. */
+  referral_code?: string | null;
 }
 
 export interface Product {
@@ -76,6 +101,8 @@ export interface Customer {
   default_area: string | null;
   default_address: string | null;
   order_count: number;
+  loyalty_points?: number;
+  referred_by_code?: string | null;
   created_at: string;
 }
 
@@ -93,15 +120,22 @@ export interface Order {
   payment_status: PaymentStatus | null;
   razorpay_payment_link_id: string | null;
   razorpay_payment_link_url: string | null;
+  razorpay_order_id?: string | null;
   notes: string | null;
   created_at: string;
   paid_at: string | null;
   delivered_at: string | null;
+  /** Unguessable slug for /track/[slug] public status page. */
+  track_public_slug?: string | null;
+  /** Optional next-day / scheduled delivery window. */
+  scheduled_for?: string | null;
+  rider_label?: string | null;
 }
 
 export interface OrderItem {
   id: string;
   order_id: string;
+  seller_id?: string;
   product_id: string | null;
   product_name: string;
   quantity: number;
@@ -131,6 +165,13 @@ export interface ConversationContext {
   order_total?: number;
   /** Set after order row exists */
   order_id?: string;
+  razorpay_order_id?: string;
+  /** When bot_language is auto: first detected customer language for consistent replies */
+  detected_reply_lang?: "gujarati" | "hindi" | "english";
+  /** Customer-requested delivery time (ISO string), from phrases like "kal subah". */
+  scheduled_for?: string;
+  /** Referral code detected in customer message (Growth store). */
+  referral_code?: string;
 }
 
 export interface ParsedLineItem {
@@ -153,7 +194,7 @@ export interface FullOrderParse {
   items: ParsedFullOrderItem[];
   area: string | null;
   address: string | null;
-  paymentMethod: "razorpay" | "cod" | null;
+  paymentMethod: "razorpay" | "cod" | "upi_manual" | null;
   confidence: "full" | "partial" | "items_only";
 }
 
@@ -174,6 +215,16 @@ export interface PlatformEvent {
   target_seller_id: string | null;
   notes: string | null;
   created_at: string;
+}
+
+export interface PlatformSettings {
+  id: number;
+  starter_product_limit: number;
+  starter_orders_per_month: number;
+  starter_analytics_days: number;
+  growth_analytics_days: number;
+  announcement: string | null;
+  updated_at: string;
 }
 
 export interface MetaWebhookPayload {
