@@ -20,6 +20,8 @@ import { pctDelta } from "@/lib/month-compare";
 
 const COLORS = ["#25D366", "#FF6B35", "#60A5FA", "#F59E0B", "#A3E635"];
 
+const COLORS = ["#25D366", "#FF6B35", "#60A5FA", "#F59E0B", "#A3E635"];
+
 export default function AdminAnalyticsClient({
   dailyOrders,
   revenueTop,
