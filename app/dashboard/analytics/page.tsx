@@ -1,6 +1,7 @@
 import AnalyticsClient from "./ui";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { analyticsHistoryCutoffIso } from "@/lib/plan-gates";
+import { accumulateMtdVersusPriorMonth } from "@/lib/month-compare";
 import { redirect } from "next/navigation";
 
 export default async function AnalyticsPage() {
@@ -55,6 +56,15 @@ export default async function AnalyticsPage() {
     .select("*", { count: "exact", head: true })
     .eq("seller_id", seller.id);
 
+  const prevMonthStart = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+  const { data: mtdCompareRows } = await supabase
+    .from("orders")
+    .select("created_at,total_amount,payment_status")
+    .eq("seller_id", seller.id)
+    .gte("created_at", prevMonthStart.toISOString());
+
+  const mtdVersusPrior = accumulateMtdVersusPriorMonth(mtdCompareRows ?? []);
+
   return (
     <AnalyticsClient
       seller={seller}
@@ -65,6 +75,14 @@ export default async function AnalyticsPage() {
         pendingOrders: pendingCount ?? 0,
         totalCustomers: customerCount ?? 0,
         productCount: products?.length ?? 0,
+      }}
+      periodCompare={{
+        labelCurrent: "Month to date",
+        labelPrevious: "Same calendar span last month",
+        currentOrders: mtdVersusPrior.mtdOrderCount,
+        currentRevenue: mtdVersusPrior.mtdRevenue,
+        previousOrders: mtdVersusPrior.prevPeriodOrderCount,
+        previousRevenue: mtdVersusPrior.prevPeriodRevenue,
       }}
     />
   );
