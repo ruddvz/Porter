@@ -23,9 +23,7 @@ export function detectLangFromText(text: string): ReplyLang {
   const lower = t.toLowerCase();
   if (/[ક-હ]|કેમ|તમે|ચો|મોકલો|હેલો/.test(t)) return "gujarati";
   if (/[क-ह]|कैसे|नमस्ते|भेजें|हेलो/.test(t)) return "hindi";
-  if (
-    /\b(kem|cho|moklo|tamaro|haan|nathi|samajyu|ferthi|tamari)\b/i.test(lower)
-  ) {
+  if (/\b(kem|cho|moklo|tamaro|haan|nathi|samajyu|ferthi|tamari)\b/i.test(lower)) {
     return "gujarati";
   }
   if (/\b(kaise|namaste|bhejen|aapka|nahi|samajh)\b/i.test(lower)) {
@@ -49,6 +47,7 @@ type Bundle = Record<
   | "same_order_missing"
   | "cod_disabled"
   | "pick_payment"
+  | "upi_not_configured"
   | "area_prompt"
   | "area_invalid"
   | "address_prompt"
@@ -60,7 +59,9 @@ type Bundle = Record<
   | "monthly_order_cap"
   | "payment_reminder"
   | "off_hours_closed"
-  | "min_order_not_met",
+  | "min_order_not_met"
+  | "awaiting_upi_instructions"
+  | "paid_ack_customer",
   string
 >;
 
@@ -75,12 +76,13 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     other_reply:
       "Hi! I'm the order bot for {store}. 🤖\nSend your grocery list to place an order.\nExample: '5kg potatoes, butter, 2L oil'",
     same_order_missing: "I don't have a previous order for you. Send me your list!",
-    cod_disabled: "Cash on delivery isn't available for this store. Reply 1 for online payment.",
-    pick_payment: "Reply 1 for online payment, 2 for cash on delivery.",
+    cod_disabled: "Cash on delivery isn't available for this store. Reply 1 for UPI prepay.",
+    pick_payment: "How do you want to pay?\n1️⃣ UPI (pay to our ID, then reply PAID)\n2️⃣ Cash on delivery\n\nReply 1 or 2",
+    upi_not_configured: "UPI payment isn't set up on this store yet. Reply 2 for cash on delivery, or call the shop.",
     area_prompt: "Send your area (building / society name optional).{zoneHint}",
     area_invalid: "Couldn't match the area. {detail}",
     address_prompt: "Got it — {area}. Please send your full address (building + flat).",
-    online_pending: "Online payment setup is pending for this store. Please call the store.",
+    online_pending: "Online payment via payment link isn't set up. Use UPI manual or cash, or call the store.",
     order_save_failed: "We couldn't save the order. Please try again.",
     payment_link_failed: "Payment link could not be created. Please try again.",
     awaiting_payment_missing: "We couldn't find that order. Please send your list again.",
@@ -90,6 +92,10 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     off_hours_closed:
       "{store} is closed right now. We'll be back during opening hours — send your order again then!",
     min_order_not_met: "Minimum order is ₹{min}. Your cart is ₹{total}. Add more items and try again.",
+    awaiting_upi_instructions:
+      "💳 Pay ₹{amount} to UPI: *{upi}*\nUse any UPI app. After paying, reply *PAID* or send your UTR.\nOrder ref: #{shortId}",
+    paid_ack_customer:
+      "Thanks! We've notified the shop. They'll confirm your payment shortly.",
   },
   gujarati: {
     parse_failed: "સમજાયું નથી — ફરી તમારી લિસ્ટ મોકલો (ગુજરાતી / હિન્દી / English).",
@@ -101,12 +107,13 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     other_reply:
       "હાય! હું {store} માટે ઓર્ડર બોટ છું. 🤖\nઓર્ડર માટે તમારી લિસ્ટ મોકલો.\nઉદાહરણ: '5kg બટાકા, માખણ, 2L તલ'",
     same_order_missing: "તમારો પહેલાનો ઓર્ડર મળતો નથી. લિસ્ટ મોકલો!",
-    cod_disabled: "આ સ્ટોર પર COD ઉપલબ્ધ નથી. ઓનલાઇન ચૂકવણી માટે 1 લખો.",
-    pick_payment: "ઓનલાઇન ચૂકવણી માટે 1, કૅશ ઑન ડિલિવરી માટે 2 લખો.",
+    cod_disabled: "આ સ્ટોર પર COD નથી. UPI માટે 1 લખો.",
+    pick_payment: "કેવી રીતે ચૂકવણી?\n1️⃣ UPI (ચૂકવણી કરીને PAID લખો)\n2️⃣ કૅશ ઑન ડિલિવરી\n\n1 અથવા 2",
+    upi_not_configured: "આ સ્ટોર પર UPI સેટ નથી. COD માટે 2 લખો અથવા કૉલ કરો.",
     area_prompt: "તમારો એરિયા મોકલો (બિલ્ડિંગ / સોસાયટી વૈકલ્પિક).{zoneHint}",
     area_invalid: "એરિયા મેચ થયો નથી. {detail}",
     address_prompt: "બરાબર — {area}. સંપૂર્ણ એડ્રેસ મોકલો (બિલ્ડિંગ + ફ્લેટ).",
-    online_pending: "આ સ્ટોર પર ઓનલાઇન ચૂકવણી સેટઅપ બાકી છે. સ્ટોરને કૉલ કરો.",
+    online_pending: "પેમેન્ટ લિંક સેટ નથી. UPI અથવા કૅશ વાપરો.",
     order_save_failed: "ઓર્ડર સાચવાતો નથી. ફરી પ્રયાસ કરો.",
     payment_link_failed: "પેમેન્ટ લિંક ન બની શકી. ફરી પ્રયાસ કરો.",
     awaiting_payment_missing: "ઓર્ડર મળતો નથી. ફરી લિસ્ટ મોકલો.",
@@ -115,6 +122,9 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     payment_reminder: "₹{amount} અહીં ચૂકવો 👇\n{url}",
     off_hours_closed: "{store} હમણાં બંધ છે. ખુલવાના સમયે ફરી ઓર્ડર મોકલો!",
     min_order_not_met: "ન્યૂનતમ ઓર્ડર ₹{min} છે. તમારી લિસ્ટ ₹{total}. વધુ વસ્તુઓ ઉમેરો.",
+    awaiting_upi_instructions:
+      "💳 ₹{amount} UPI પર મોકલો: *{upi}*\nચૂકવણી પછી *PAID* અથવા UTR મોકલો.\nઓર્ડર #{shortId}",
+    paid_ack_customer: "આભાર! દુકાનને જાણ કરી દીધી — તેઓ ટૂંકમાં કન્ફર્મ કરશે.",
   },
   hindi: {
     parse_failed: "समझ नहीं आया — कृपया अपनी सूची फिर भेजें (गुजराती / हिंदी / English)।",
@@ -126,12 +136,13 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     other_reply:
       "नमस्ते! मैं {store} के लिए ऑर्डर बॉट हूँ। 🤖\nऑर्डर के लिए अपनी सूची भेजें।\nउदाहरण: '5kg आलू, मक्खन, 2L तेल'",
     same_order_missing: "पिछला ऑर्डर नहीं मिला। सूची भेजें!",
-    cod_disabled: "इस स्टोर पर COD नहीं है। ऑनलाइन भुगतान के लिए 1 भेजें।",
-    pick_payment: "ऑनलाइन के लिए 1, कैश ऑन डिलिवरी के लिए 2 भेजें।",
+    cod_disabled: "इस स्टोर पर COD नहीं। UPI के लिए 1 भेजें।",
+    pick_payment: "कैसे भुगतान?\n1️⃣ UPI (भुगतान करके PAID लिखें)\n2️⃣ कैश ऑन डिलिवरी\n\n1 या 2",
+    upi_not_configured: "इस स्टोर पर UPI सेट नहीं है। COD के लिए 2 या कॉल करें।",
     area_prompt: "अपना एरिया भेजें (बिल्डिंग / सोसायटी वैकल्पिक)।{zoneHint}",
     area_invalid: "एरिया मैच नहीं हुआ। {detail}",
     address_prompt: "ठीक — {area}। पूरा पता भेजें (बिल्डिंग + फ्लैट)।",
-    online_pending: "इस स्टोर पर ऑनलाइन सेटअप पेंडिंग है। कॉल करें।",
+    online_pending: "पेमेंट लिंक सेट नहीं। UPI या कैश उपयोग करें।",
     order_save_failed: "ऑर्डर सेव नहीं हुआ। फिर कोशिश करें।",
     payment_link_failed: "पेमेंट लिंक नहीं बन सका। फिर कोशिश करें।",
     awaiting_payment_missing: "ऑर्डर नहीं मिला। सूची फिर भेजें।",
@@ -140,6 +151,9 @@ const BUNDLES: Record<ReplyLang, Bundle> = {
     payment_reminder: "₹{amount} यहाँ भुगतान करें 👇\n{url}",
     off_hours_closed: "{store} अभी बंद है। खुलने के बाद फिर ऑर्डर भेजें!",
     min_order_not_met: "न्यूनतम ऑर्डर ₹{min} है। आपकी लिस्ट ₹{total} है। और आइटम जोड़ें।",
+    awaiting_upi_instructions:
+      "💳 ₹{amount} इस UPI पर भेजें: *{upi}*\nभुगतान के बाद *PAID* या UTR भेजें।\nऑर्डर #{shortId}",
+    paid_ack_customer: "धन्यवाद! दुकान को सूचना दे दी गई है।",
   },
 };
 
@@ -159,7 +173,6 @@ export function t(
   return applyTemplate(BUNDLES[lang][key] ?? BUNDLES.english[key], vars);
 }
 
-/** Localize the static first-welcome block (custom intro is left as seller wrote it). */
 export function formatPartialPaymentPrompt(
   lang: ReplyLang,
   lines: string,
@@ -169,12 +182,12 @@ export function formatPartialPaymentPrompt(
 ): string {
   const base = `${lines}\n💰 Total: ₹${total}\n📍 ${zone} — ${address}`;
   if (lang === "gujarati") {
-    return `સમજાયું!\n${base}\n\nકેવી રીતે ચૂકવણી?\n1️⃣ ઑનલાઇન (UPI/Card)\n2️⃣ કૅશ ઑન ડિલિવરી`;
+    return `સમજાયું!\n${base}\n\nકેવી રીતે ચૂકવણી?\n1️⃣ UPI\n2️⃣ કૅશ ઑન ડિલિવરી`;
   }
   if (lang === "hindi") {
-    return `समझ गया!\n${base}\n\nकैसे भुगतान?\n1️⃣ ऑनलाइन (UPI/Card)\n2️⃣ कैश ऑन डिलिवरी`;
+    return `समझ गया!\n${base}\n\nकैसे भुगतान?\n1️⃣ UPI\n2️⃣ कैश ऑन डिलिवरी`;
   }
-  return `Got it!\n${base}\n\nHow to pay?\n1️⃣ Online (UPI/Card)\n2️⃣ Cash on Delivery`;
+  return `Got it!\n${base}\n\nHow to pay?\n1️⃣ UPI\n2️⃣ Cash on delivery`;
 }
 
 export function formatOrderConfirmedPrepaid(
@@ -201,6 +214,31 @@ export function formatOrderConfirmedPrepaid(
   return `${header}\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\n${linkUrl}${footer}`;
 }
 
+export function formatOrderConfirmedUpiManual(
+  lang: ReplyLang,
+  summary: string,
+  area: string,
+  address: string,
+  total: number,
+  upi: string,
+  shortId: string,
+  storeName: string
+): string {
+  const header =
+    lang === "gujarati"
+      ? "✅ ઓર્ડર મળ્યો!"
+      : lang === "hindi"
+        ? "✅ ऑर्डर मिला!"
+        : "✅ Order received!";
+  const pay =
+    lang === "gujarati"
+      ? `💳 ₹${total} — UPI: ${upi}\nપછી *PAID* લખો (#${shortId})`
+      : lang === "hindi"
+        ? `💳 ₹${total} — UPI: ${upi}\nफिर *PAID* भेजें (#${shortId})`
+        : `💳 Pay ₹${total} to UPI: ${upi}\nThen reply *PAID* (ref #${shortId})`;
+  return `${header}\n${summary}\n📍 ${area} — ${address}\n${pay}\n\n*Porter — ${storeName}*`;
+}
+
 export function formatOrderConfirmedCod(
   lang: ReplyLang,
   summary: string,
@@ -224,7 +262,6 @@ export function formatOrderConfirmedCod(
   return `${header}\n${summary}\n📍 ${area} — ${address}\n💰 Total: ₹${total}\n${codLine}\n\n*Porter — ${storeName}*`;
 }
 
-/** Same-as-last-time when customer address is already known — asks for payment choice. */
 export function formatSameOrderPaymentPrompt(
   lang: ReplyLang,
   linesJoined: string,
@@ -234,13 +271,15 @@ export function formatSameOrderPaymentPrompt(
 ): string {
   const base = `${linesJoined}\n💰 Total: ₹${total}\n📍 ${zone} — ${address}`;
   if (lang === "gujarati") {
-    return `જૂનો ઓર્ડર લોડ થયો!\n${base}\n\nકેવી રીતે ચૂકવણી?\n1️⃣ ઑનલાઇન (UPI/Card)\n2️⃣ કૅશ ઑન ડિલિવરી`;
+    return `જૂનો ઓર્ડર લોડ થયો!\n${base}\n\nકેવી રીતે ચૂકવણી?\n1️⃣ UPI\n2️⃣ કૅશ ઑન ડિલિવરી`;
   }
   if (lang === "hindi") {
-    return `पिछला ऑर्डर लोड हो गया!\n${base}\n\nकैसे भुगतान?\n1️⃣ ऑनलाइन (UPI/Card)\n2️⃣ कैश ऑन डिलिवरी`;
+    return `पिछला ऑर्डर लोड हो गया!\n${base}\n\nकैसे भुगतान?\n1️⃣ UPI\n2️⃣ कैश ऑन डिलिवरी`;
   }
-  return `Same order loaded!\n${base}\n\nHow to pay?\n1️⃣ Online (UPI/Card)\n2️⃣ Cash on Delivery`;
+  return `Same order loaded!\n${base}\n\nHow to pay?\n1️⃣ UPI\n2️⃣ Cash on delivery`;
 }
+
+export function formatOrderSummaryPrompt(
   lang: ReplyLang,
   lines: string,
   total: number,
@@ -255,10 +294,10 @@ export function formatSameOrderPaymentPrompt(
         : "Got it! Here's your order:";
   const payOnly =
     lang === "gujarati"
-      ? "\n\nઆ સ્ટોર પર ફક્ત ઑનલાઇન ચૂકવણી."
+      ? "\n\nઆ સ્ટોર પર ફક્ત UPI પ્રીપે કરો."
       : lang === "hindi"
-        ? "\n\nइस स्टोर पर केवल ऑनलाइन भुगतान."
-        : "\n\nOnline payment only on this store.";
+        ? "\n\nइस स्टोर पर केवल UPI प्रीपे."
+        : "\n\nThis store only accepts UPI prepay for online orders.";
   const area =
     lang === "gujarati"
       ? "\n\nતમારો એરિયા મોકલો."
@@ -267,16 +306,18 @@ export function formatSameOrderPaymentPrompt(
         : "\n\nSend your area.";
   const codMsg =
     lang === "gujarati"
-      ? `\n\nકેવી રીતે ચૂકવણી?\n1️⃣ ઑનલાઇન (UPI/Card) — હમણાં\n2️⃣ કૅશ ઑન ડિલિવરી — આવે ત્યારે\n\n1 અથવા 2 લખો`
+      ? `\n\nકેવી રીતે ચૂકવણી?\n1️⃣ UPI — પહેલાં ચૂકવણી\n2️⃣ કૅશ ઑન ડિલિવરી\n\n1 અથવા 2 લખો`
       : lang === "hindi"
-        ? `\n\nकैसे भुगतान?\n1️⃣ ऑनलाइन (UPI/Card) — अभी\n2️⃣ कैश ऑन डिलिवरी — डिलिवरी पर\n\n1 या 2 भेजें`
-        : `\n\nHow do you want to pay?\n1️⃣ Online (UPI/Card) — pay now\n2️⃣ Cash on Delivery — pay when it arrives\n\nReply 1 or 2`;
+        ? `\n\nकैसे भुगतान?\n1️⃣ UPI — पहले भुगतान\n2️⃣ कैश ऑन डिलिवरी\n\n1 या 2 भेजें`
+        : `\n\nHow do you want to pay?\n1️⃣ UPI — pay first\n2️⃣ Cash on delivery\n\nReply 1 or 2`;
 
   if (!codChoice) {
     return `${header}\n${lines}\n💰 Total: ₹${total}${payOnly}${zoneHint}${area}`;
   }
   return `${header}\n${lines}\n💰 Total: ₹${total}${codMsg}`;
 }
+
+export function firstWelcomeBody(storeName: string, zones: string, lang: ReplyLang): string {
   const z = zones || "—";
   if (lang === "gujarati") {
     return `કેમ છો! 👋 ${storeName} પર Porter માં સ્વાગત.
@@ -289,7 +330,7 @@ export function formatSameOrderPaymentPrompt(
 મને ગુજરાતી, હિન્દી અને English સમજાય છે!
 
 ડિલિવરી એરિયા: ${z}
-ચૂકવણી: ઑનલાઇન (UPI/Card) અથવા કૅશ ઑન ડિલિવરી
+ચૂકવણી: મુખ્યત્વે UPI અથવા કૅશ ઑન ડિલિવરી
 
 જ્યારે તૈયાર હો ત્યારે લિસ્ટ મોકલો 🛒`;
   }
@@ -304,7 +345,7 @@ export function formatSameOrderPaymentPrompt(
 मुझे गुजराती, हिंदी और English समझ आती है!
 
 डिलीवरी एरिया: ${z}
-भुगतान: ऑनलाइन (UPI/Card) या कैश ऑन डिलिवरी
+भुगतान: ज़्यादातर UPI या कैश ऑन डिलिवरी
 
 जब तैयार हों, सूची भेजें 🛒`;
   }
@@ -318,7 +359,7 @@ I'm your order assistant. Here's how to order:
 I understand Gujarati, Hindi and English!
 
 Delivery areas: ${z}
-Payment: Online (UPI/Card) or Cash on Delivery
+Payment: Mostly UPI or cash on delivery
 
 Send your list whenever you're ready 🛒`;
 }

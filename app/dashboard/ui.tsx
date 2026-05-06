@@ -63,7 +63,7 @@ const COLUMN_ORDER: KanbanColumnId[] = [
 function isAwaitingPayment(o: OrderWithItems): boolean {
   return (
     o.status === "pending" &&
-    o.payment_method === "razorpay" &&
+    (o.payment_method === "razorpay" || o.payment_method === "upi_manual") &&
     (o.payment_status === "unpaid" || o.payment_status == null)
   );
 }
@@ -240,6 +240,21 @@ export default function LiveOrdersBoard({
       if (error) {
         updateOrder(prev);
         toast(error.message, "error");
+        return;
+      }
+      if (
+        updates.payment_status === "paid" &&
+        prev.payment_status !== "paid" &&
+        order.seller_id
+      ) {
+        await supabase.from("order_events").insert({
+          order_id: order.id,
+          seller_id: order.seller_id,
+          event_type: "payment_confirmed_dashboard",
+          status: updates.status ?? prev.status,
+          payment_status: "paid",
+          source: "dashboard",
+        });
       }
     },
     [supabase, updateOrder, toast],
@@ -259,7 +274,8 @@ export default function LiveOrdersBoard({
       if (overId === "awaiting_payment") {
         if (order.payment_method === "cod") return;
         if (order.status !== "pending") return;
-        void patchOrder(order, { payment_method: "razorpay", payment_status: "unpaid" });
+        const method = order.payment_method === "razorpay" ? "razorpay" : "upi_manual";
+        void patchOrder(order, { payment_method: method, payment_status: "unpaid" });
         return;
       }
       if (COLUMN_ORDER.includes(overId as KanbanColumnId) && overId !== "awaiting_payment") {

@@ -288,11 +288,13 @@ These are bugs or missing features that break the core product promise.
 
 ### Phase 3 — System Depth (reliability, security, monetization)
 
+**Progress:** Tasks **13–16** partially shipped — UPI-first bot flow, `order_events` + Activity panel, Meta token encryption via encrypt API, Razorpay link retries + webhook JSON log lines + event inserts. Still open: admin export (#17), billing (#18), full log drain.
+
 | # | Task | Files Touched |
 |---|------|---------------|
 | 13 | Encrypt Razorpay + Meta secrets at rest using `field-crypto.ts` | `lib/field-crypto.ts`, `lib/seller-credentials.ts`, `app/api/seller/encrypt-payments/route.ts` |
-| 14 | `order_events` audit trail table + timeline UI | new migration, `components/orders/OrderDetailPanel.tsx` |
-| 15 | UPI manual payment conversation path | `lib/conversation.ts`, `app/dashboard/orders/ui.tsx` |
+| 14 | `order_events` audit trail table + timeline UI | `009_order_events.sql`, `components/orders/OrderDetailPanel.tsx` |
+| 15 | UPI manual payment conversation path | `lib/conversation.ts`, `lib/bot-locale.ts`, `app/dashboard/ui.tsx` |
 | 16 | Structured logging + Razorpay retry loop in webhook | `app/api/webhook/razorpay/route.ts`, `lib/razorpay.ts` |
 | 17 | Admin CSV/XLSX bulk export + `platform_events` activity feed | `app/admin/` routes |
 | 18 | Billing / subscription integration (Razorpay Subscriptions) | new `app/api/billing/` routes, `app/dashboard/settings/ui.tsx` |

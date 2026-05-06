@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { waitUntil } from "@vercel/functions";
+import { insertOrderEvent } from "@/lib/order-events";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { sendMessage } from "@/lib/meta-whatsapp";
 
@@ -61,6 +62,16 @@ async function markOrderPaidFromLink(supabase: ReturnType<typeof createSupabaseS
     })
     .eq("id", order.id);
 
+  await insertOrderEvent(supabase, {
+    orderId: order.id as string,
+    sellerId: order.seller_id as string,
+    eventType: "payment_received_webhook",
+    status: "preparing",
+    paymentStatus: "paid",
+    note: "payment_link.paid",
+    source: "webhook",
+  });
+
   await supabase
     .from("conversations")
     .update({ state: "complete", last_message_at: now })
@@ -110,6 +121,16 @@ async function handlePaymentCaptured(payload: { payment?: { entity?: Record<stri
     })
     .eq("id", order.id);
 
+  await insertOrderEvent(supabase, {
+    orderId: order.id as string,
+    sellerId: order.seller_id as string,
+    eventType: "payment_received_webhook",
+    status: "preparing",
+    paymentStatus: "paid",
+    note: `payment.captured razorpay_payment=${ent.id ?? ""}`,
+    source: "webhook",
+  });
+
   const seller = order.sellers as import("@/types").Seller;
   await supabase
     .from("conversations")
@@ -134,6 +155,15 @@ async function handlePaymentFailed(payload: { payment?: { entity?: Record<string
   const seller = order.sellers as import("@/types").Seller;
   const phone = normalizePhone(order.customer_phone as string);
   await sendMessage(phone, "Payment nathi thayu. Ferthi payment link par try karo.", seller);
+  await insertOrderEvent(supabase, {
+    orderId: order.id as string,
+    sellerId: order.seller_id as string,
+    eventType: "payment_failed_webhook",
+    status: order.status as string,
+    paymentStatus: order.payment_status as string,
+    note: "payment.failed",
+    source: "webhook",
+  });
   await supabase
     .from("conversations")
     .update({ state: "awaiting_payment", last_message_at: new Date().toISOString() })
@@ -164,6 +194,7 @@ export async function POST(req: Request) {
 
   const ev = event.event;
   const payload = event.payload ?? {};
+  console.log(JSON.stringify({ scope: "razorpay-webhook", event: ev ?? null }));
 
   if (ev === "payment_link.paid") {
     const pl = (event as { payment_link?: { entity?: { id?: string } } }).payment_link;

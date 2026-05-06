@@ -1,4 +1,5 @@
 import type { Seller } from "@/types";
+import { getMetaAccessTokenForSeller } from "@/lib/seller-credentials";
 
 const GRAPH_VERSION = "v19.0";
 
@@ -6,10 +7,10 @@ const GRAPH_VERSION = "v19.0";
 export async function sendMessage(
   to: string,
   message: string,
-  seller: Pick<Seller, "meta_phone_number_id" | "meta_access_token">
+  seller: Pick<Seller, "meta_phone_number_id" | "meta_access_token"> & { meta_access_token_enc?: string | null }
 ): Promise<boolean> {
   const phoneId = seller.meta_phone_number_id;
-  const token = seller.meta_access_token;
+  const token = getMetaAccessTokenForSeller(seller as Seller);
   if (!phoneId || !token) {
     console.error("[meta-whatsapp] Missing meta_phone_number_id or meta_access_token for seller");
     return false;

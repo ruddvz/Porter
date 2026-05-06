@@ -26,6 +26,7 @@ export type ConversationState =
   | "collecting_area"
   | "collecting_address"
   | "awaiting_payment"
+  | "awaiting_upi_confirmation"
   | "complete"
   | "failed";
 
@@ -57,6 +58,7 @@ export interface Seller {
   created_at: string;
   meta_phone_number_id: string | null;
   meta_access_token: string | null;
+  meta_access_token_enc?: string | null;
   cod_enabled: boolean;
   bot_intro_message?: string | null;
   bot_language?: BotLanguagePreference | string | null;
@@ -177,7 +179,7 @@ export interface FullOrderParse {
   items: ParsedFullOrderItem[];
   area: string | null;
   address: string | null;
-  paymentMethod: "razorpay" | "cod" | null;
+  paymentMethod: "razorpay" | "cod" | "upi_manual" | null;
   confidence: "full" | "partial" | "items_only";
 }
 

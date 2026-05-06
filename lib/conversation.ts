@@ -5,13 +5,15 @@ import { createPaymentLink } from "@/lib/razorpay";
 import { fuzzyMatchProducts } from "@/lib/fuzzy";
 import { isProductListedForBot } from "@/lib/product-catalog";
 import { checkGate } from "@/lib/plan-gates";
-import { getRazorpayKeysForSeller } from "@/lib/seller-credentials";
+import { getRazorpayKeysForSeller, getUpiForSeller } from "@/lib/seller-credentials";
+import { insertOrderEvent } from "@/lib/order-events";
 import type {
   BotLanguagePreference,
   Conversation,
   ConversationContext,
   FullOrderParse,
   MessageIntent,
+  Order,
   OrderStatus,
   ParsedLineItem,
   PaymentMethod,
@@ -24,6 +26,7 @@ import {
   firstWelcomeBody,
   formatOrderConfirmedCod,
   formatOrderConfirmedPrepaid,
+  formatOrderConfirmedUpiManual,
   formatOrderSummaryPrompt,
   formatPartialPaymentPrompt,
   formatSameOrderPaymentPrompt,
@@ -206,6 +209,9 @@ export async function handleIncomingCustomerMessage(
     case "collecting_address":
       await runCollectingAddress(supabase, seller, conversation, phone, text, now, ctx);
       break;
+    case "awaiting_upi_confirmation":
+      await runAwaitingUpiConfirmation(supabase, seller, conversation, phone, text, now, ctx);
+      break;
     case "awaiting_payment":
       await runAwaitingPayment(supabase, seller, conversation, phone, text, ctx);
       break;
@@ -306,8 +312,9 @@ async function runCollectingItems(
         await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
         return;
       }
+      const pm = fullParse.paymentMethod;
       const paymentMethod: PaymentMethod | null =
-        fullParse.paymentMethod === "cod" ? "cod" : fullParse.paymentMethod === "razorpay" ? "razorpay" : null;
+        pm === "cod" ? "cod" : pm === "upi_manual" || pm === "razorpay" ? "upi_manual" : null;
       if (!paymentMethod) {
         await continueNormalParse(supabase, seller, conversation, phone, text, now, list, welcomeAlreadySent, ctx);
         return;
@@ -421,7 +428,7 @@ async function continueNormalParse(
       .from("conversations")
       .update({
         state: "collecting_area",
-        context: { ...ctx, items: parsed, order_total: total, payment_method: "razorpay" as PaymentMethod },
+        context: { ...ctx, items: parsed, order_total: total, payment_method: "upi_manual" as PaymentMethod },
         last_message_at: now,
       })
       .eq("id", conversation.id);
@@ -669,14 +676,30 @@ async function finalizeOrderFromContext(
 ) {
   const lang = replyLangFromCtx(seller, ctx);
   const items = ctx.items ?? [];
-  const paymentMethod = ctx.payment_method ?? "razorpay";
+  let paymentMethod: PaymentMethod = ctx.payment_method ?? "upi_manual";
   const area = ctx.area ?? "";
   const address = (ctx.address ?? "").trim();
   const total = ctx.order_total ?? round2(items.reduce((s, i) => s + i.total_price, 0));
 
+  const upi = getUpiForSeller(seller);
+  const rzp = getRazorpayKeysForSeller(seller);
+
+  if (paymentMethod === "razorpay" && !rzp) {
+    paymentMethod = upi ? "upi_manual" : paymentMethod;
+  }
+
+  if (paymentMethod === "upi_manual" && !upi) {
+    await sendMessage(phone, t("upi_not_configured", lang), seller);
+    return;
+  }
+
+  if (paymentMethod === "cod" && !seller.cod_enabled) {
+    await sendMessage(phone, t("cod_disabled", lang), seller);
+    return;
+  }
+
   const minOrder = seller.min_order_amount != null ? Number(seller.min_order_amount) : null;
   if (minOrder != null && Number.isFinite(minOrder) && minOrder > 0 && total < minOrder) {
-    const lang = replyLangFromCtx(seller, ctx);
     await sendMessage(
       phone,
       t("min_order_not_met", lang, { min: String(minOrder), total: String(total) }),
@@ -685,7 +708,6 @@ async function finalizeOrderFromContext(
     return;
   }
 
-  const rzp = getRazorpayKeysForSeller(seller);
   if (paymentMethod === "razorpay" && !rzp) {
     await sendMessage(phone, t("online_pending", lang), seller);
     return;
@@ -745,6 +767,15 @@ async function finalizeOrderFromContext(
     await sendMessage(phone, t("order_save_failed", lang), seller);
     return;
   }
+
+  await insertOrderEvent(supabase, {
+    orderId: order.id,
+    sellerId: seller.id,
+    eventType: "order_created",
+    status: order.status,
+    paymentStatus: order.payment_status ?? undefined,
+    source: "bot",
+  });
 
   const orderItems = items.map((i) => ({
     order_id: order.id,
@@ -823,6 +854,29 @@ async function finalizeOrderFromContext(
     return;
   }
 
+  if (paymentMethod === "upi_manual" && upi) {
+    await supabase
+      .from("conversations")
+      .update({
+        state: "awaiting_upi_confirmation",
+        context: { ...ctx, address, order_id: order.id },
+        last_message_at: now,
+      })
+      .eq("id", conversation.id);
+
+    const shortId = order.id.slice(0, 8);
+    const msg = formatConfirm(
+      `${formatOrderConfirmedUpiManual(lang, summary, area, address, total, upi, shortId, seller.store_name)}\n\n${t(
+        "awaiting_upi_instructions",
+        lang,
+        { amount: String(total), upi, shortId }
+      )}`
+    );
+    await sendMessage(phone, msg, seller);
+    void notifyOrderPush(seller.id, "New order — UPI pending", `₹${total} — ${shortId}`);
+    return;
+  }
+
   await supabase
     .from("conversations")
     .update({
@@ -850,8 +904,27 @@ async function runCollectingPaymentMethod(
   const lang = replyLangFromCtx(seller, ctx);
   const txt = text.trim().toLowerCase();
   let method: PaymentMethod | null = null;
-  if (txt === "1" || txt.includes("online") || txt.includes("upi") || txt.includes("card") || txt.includes("prepaid")) {
-    method = "razorpay";
+  const upiAvail = getUpiForSeller(seller);
+  const rzpKeys = getRazorpayKeysForSeller(seller);
+
+  if (txt === "1" || txt.includes("upi") || txt.includes("prepaid") || txt.includes("online") || txt.includes("card")) {
+    if (upiAvail) method = "upi_manual";
+    else if (rzpKeys) method = "razorpay";
+    else if (seller.cod_enabled) {
+      await sendMessage(
+        phone,
+        lang === "gujarati"
+          ? "UPI સેટ નથી — કૅશ માટે 2 લખો."
+          : lang === "hindi"
+            ? "UPI सेट नहीं — COD के लिए 2 भेजें।"
+            : "UPI isn't configured — reply 2 for cash on delivery.",
+        seller
+      );
+      return;
+    } else {
+      await sendMessage(phone, t("upi_not_configured", lang), seller);
+      return;
+    }
   } else if (txt === "2" || txt.includes("cod") || txt.includes("cash")) {
     method = "cod";
   }
@@ -955,6 +1028,104 @@ async function runCollectingAddress(
     ...ctx,
     address,
   });
+}
+
+/** Customer replied while waiting for manual UPI confirmation. */
+async function runAwaitingUpiConfirmation(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  seller: Seller,
+  conversation: Conversation,
+  phone: string,
+  text: string,
+  now: string,
+  ctx: ConversationContext
+) {
+  const lang = replyLangFromCtx(seller, ctx);
+  const raw = text.trim();
+  const lower = raw.toLowerCase();
+  const paidLike =
+    /\bpaid\b/i.test(lower) ||
+    /\butr\b/i.test(lower) ||
+    /\butr[:#\s]/i.test(lower) ||
+    /^done$/i.test(lower) ||
+    /^pay\s*kar\s*diya/i.test(lower) ||
+    /^pay\s*kar\s*didi/i.test(lower) ||
+    /^ચૂકવણી\s*થઈ/i.test(raw) ||
+    /^भुगतान\s*कर\s*दिया/i.test(lower);
+
+  if (!paidLike) {
+    const orderId = ctx.order_id;
+    if (!orderId) {
+      await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+      return;
+    }
+    const { data: order } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+    const upi = getUpiForSeller(seller);
+    if (!order || order.payment_method !== "upi_manual" || !upi) {
+      await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+      return;
+    }
+    const amt = order.total_amount ?? 0;
+    const shortId = order.id.slice(0, 8);
+    await sendMessage(
+      phone,
+      t("awaiting_upi_instructions", lang, {
+        amount: String(amt),
+        upi,
+        shortId,
+      }),
+      seller
+    );
+    return;
+  }
+
+  const orderId = ctx.order_id;
+  if (!orderId) {
+    await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+    return;
+  }
+
+  const { data: orderRow } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
+  const order = orderRow as Order | null;
+  if (!order || order.seller_id !== seller.id || order.payment_method !== "upi_manual") {
+    await sendMessage(phone, t("awaiting_payment_missing", lang), seller);
+    return;
+  }
+
+  await supabase
+    .from("orders")
+    .update({
+      payment_status: "paid",
+      paid_at: now,
+      status: "preparing",
+    })
+    .eq("id", order.id);
+
+  await insertOrderEvent(supabase, {
+    orderId: order.id,
+    sellerId: seller.id,
+    eventType: "customer_claimed_upi_paid",
+    status: "preparing",
+    paymentStatus: "paid",
+    note: raw.slice(0, 500),
+    source: "bot",
+  });
+
+  await supabase
+    .from("conversations")
+    .update({
+      state: "complete",
+      context: { ...ctx, order_id: order.id },
+      last_message_at: now,
+    })
+    .eq("id", conversation.id);
+
+  await sendMessage(phone, t("paid_ack_customer", lang), seller);
+  void notifyOrderPush(
+    seller.id,
+    "Customer says paid (UPI)",
+    `₹${order.total_amount ?? "?"} — ${order.id.slice(0, 8)}`
+  );
 }
 
 /** Resends Razorpay link when customer messages again before paying. */

@@ -32,7 +32,7 @@ export default function OrderDetailPanel({
   onSaved,
   onOrderUpdate,
 }: {
-  seller: Pick<Seller, "store_name" | "delivery_fee" | "city">;
+  seller: Pick<Seller, "id" | "store_name" | "delivery_fee" | "city">;
   order: OrderWithItems | null;
   onClose: () => void;
   onSaved: () => void;
@@ -40,17 +40,72 @@ export default function OrderDetailPanel({
 }) {
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
+  const o = order;
   const [note, setNote] = useState(order?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+
+  const [events, setEvents] = useState<{ event_type: string; note: string | null; created_at: string }[]>([]);
 
   useEffect(() => {
     setNote(order?.notes ?? "");
   }, [order?.id, order?.notes]);
 
-  const o = order;
+  useEffect(() => {
+    if (!o?.id || !seller.id) {
+      setEvents([]);
+      return;
+    }
+    void supabase
+      .from("order_events")
+      .select("event_type, note, created_at")
+      .eq("order_id", o.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) =>
+        setEvents((data as { event_type: string; note: string | null; created_at: string }[]) ?? [])
+      );
+  }, [o?.id, seller.id, supabase]);
   const statusBadge = useMemo(() => (o ? orderStatusBadge(o.status) : null), [o]);
   const pay = useMemo(() => (o ? paymentBadge(o) : null), [o]);
+
+  const markPaidUpi = useCallback(async () => {
+    if (!o) return;
+    setBusy(true);
+    const prev = { ...o };
+    const updates = {
+      payment_status: "paid" as const,
+      paid_at: new Date().toISOString(),
+      status: "preparing" as const,
+    };
+    onOrderUpdate?.({ ...o, ...updates });
+    const { error } = await supabase.from("orders").update(updates).eq("id", o.id);
+    if (!error) {
+      await supabase.from("order_events").insert({
+        order_id: o.id,
+        seller_id: seller.id,
+        event_type: "payment_confirmed_dashboard",
+        status: "preparing",
+        payment_status: "paid",
+        source: "dashboard",
+      });
+    }
+    setBusy(false);
+    if (error) {
+      onOrderUpdate?.(prev);
+      toast(error.message, "error");
+    } else {
+      toast("Marked paid", "success");
+      void supabase
+        .from("order_events")
+        .select("event_type, note, created_at")
+        .eq("order_id", o.id)
+        .order("created_at", { ascending: true })
+        .then(({ data }) =>
+          setEvents((data as { event_type: string; note: string | null; created_at: string }[]) ?? [])
+        );
+      onSaved();
+    }
+  }, [o, onOrderUpdate, onSaved, seller.id, supabase, toast]);
 
   const markCodCollected = useCallback(async () => {
     if (!o) return;
@@ -317,6 +372,23 @@ export default function OrderDetailPanel({
           </section>
 
           <section className="mt-6">
+            <h3 className="text-label text-porter-text-muted">Activity</h3>
+            {events.length === 0 ? (
+              <p className="mt-2 text-sm text-porter-text-muted">No payment or status events logged yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-2 border-l border-porter-bg-border pl-4">
+                {events.map((ev) => (
+                  <li key={`${ev.event_type}-${ev.created_at}`} className="text-sm">
+                    <span className="font-medium text-porter-text-primary">{ev.event_type.replace(/_/g, " ")}</span>
+                    <span className="text-mono text-xs text-porter-text-muted"> · {new Date(ev.created_at).toLocaleString()}</span>
+                    {ev.note ? <p className="mt-0.5 text-porter-text-secondary">{ev.note}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-6">
             <h3 className="text-label text-porter-text-muted">Notes</h3>
             <textarea
               value={note}
@@ -333,6 +405,11 @@ export default function OrderDetailPanel({
             {o.payment_method === "cod" && o.payment_status === "cod_pending" && (
               <Button type="button" variant="primary" size="sm" className="bg-porter-orange-500 hover:bg-porter-orange-600" loading={busy} onClick={() => void markCodCollected()}>
                 Mark cash collected
+              </Button>
+            )}
+            {o.payment_method === "upi_manual" && o.payment_status === "unpaid" && o.status === "pending" && (
+              <Button type="button" variant="primary" size="sm" loading={busy} onClick={() => void markPaidUpi()}>
+                Confirm UPI received
               </Button>
             )}
             <Button

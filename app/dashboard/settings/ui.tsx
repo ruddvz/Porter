@@ -196,6 +196,17 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
     if (error) toast(error.message, "error");
     else {
       toast("WhatsApp API settings saved", "success");
+      if (metaToken.trim()) {
+        const enc = await fetch("/api/seller/encrypt-payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ meta_access_token: metaToken.trim() }),
+        });
+        if (enc.ok) {
+          const j = (await enc.json()) as { ok?: boolean };
+          if (j.ok) toast("Access token encrypted at rest.", "success");
+        }
+      }
       setMetaToken("");
     }
   }

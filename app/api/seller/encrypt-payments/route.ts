@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { upi?: string; razorpay_key_id?: string; razorpay_key_secret?: string };
+  let body: { upi?: string; razorpay_key_id?: string; razorpay_key_secret?: string; meta_access_token?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -41,6 +41,10 @@ export async function POST(req: Request) {
   if (body.razorpay_key_secret !== undefined) {
     payload.razorpay_key_secret_enc = encryptOptional(body.razorpay_key_secret || null, secret);
     payload.razorpay_key_secret = null;
+  }
+  if (body.meta_access_token !== undefined) {
+    payload.meta_access_token_enc = encryptOptional(body.meta_access_token || null, secret);
+    payload.meta_access_token = null;
   }
 
   const { error } = await admin.from("sellers").update(payload).eq("id", seller.id);

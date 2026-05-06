@@ -11,6 +11,7 @@ const NUDGE_STATES = [
   "collecting_area",
   "collecting_address",
   "awaiting_payment",
+  "awaiting_upi_confirmation",
 ] as const;
 
 /** Idle before first nudge (minutes). */

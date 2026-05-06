@@ -193,13 +193,13 @@ Extract ALL of the following if present:
 - items: grocery items with quantities (e.g. '5 kilo bataka' = {name:'Potato', quantity:5, unit:'kg'})
 - area: delivery neighbourhood (match against available zones)
 - address: building name + flat/house number
-- paymentMethod: 'razorpay' (online/upi/card/1) or 'cod' (cash/cod/2/haath ma)
+- paymentMethod: 'upi_manual' (UPI / prepaid / online / gpay / phonepe / paytm / 1) or 'cod' (cash on delivery / cod / 2 / haath ma)
 
 Available delivery zones: ${zones}
 Available products: ${catalogNames}
 
 Return ONLY valid JSON, no markdown, no explanation:
-{"items":[{"name":"string","quantity":number,"unit":"string"}],"area":string|null,"address":string|null,"paymentMethod":"razorpay"|"cod"|null,"confidence":"full"|"partial"|"items_only"}
+{"items":[{"name":"string","quantity":number,"unit":"string"}],"area":string|null,"address":string|null,"paymentMethod":"upi_manual"|"cod"|null,"confidence":"full"|"partial"|"items_only"}
 
 Message:
 ${text}`;
