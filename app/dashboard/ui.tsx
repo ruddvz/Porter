@@ -77,7 +77,7 @@ function columnLabel(s: KanbanColumnId): string {
     case "awaiting_payment":
       return "Awaiting payment";
     case "preparing":
-      return "Preparing";
+      return "In progress";
     case "paid":
       return "Paid";
     case "out_for_delivery":
@@ -319,7 +319,10 @@ export default function LiveOrdersBoard({
         </Card>
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-8 xl:gap-2" ref={boardRef}>
+          <div
+            className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] xl:grid xl:snap-none xl:grid-cols-8 xl:gap-2 xl:overflow-visible xl:pb-0 [&::-webkit-scrollbar]:hidden"
+            ref={boardRef}
+          >
             {COLUMN_ORDER.map((col) => (
               <DroppableColumn key={col} id={col} title={columnLabel(col)} count={board[col].length}>
                 {board[col].length === 0 ? (
@@ -386,7 +389,12 @@ function DroppableColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className={isOver ? "ring-2 ring-porter-green-500/40 ring-offset-2 ring-offset-porter-bg-base rounded-xl" : ""}>
+    <div
+      ref={setNodeRef}
+      className={`w-[min(90vw,320px)] shrink-0 snap-start xl:w-auto xl:min-w-0 xl:snap-align-none ${
+        isOver ? "ring-2 ring-porter-green-500/40 ring-offset-2 ring-offset-porter-bg-base rounded-xl" : ""
+      }`}
+    >
       <Card padding="sm" className="flex max-h-[calc(100vh-18rem)] min-h-[200px] flex-col xl:max-h-[calc(100vh-14rem)]">
         <div className="flex shrink-0 items-center justify-between border-b border-porter-bg-border px-2 py-2">
           <span className="text-label text-porter-text-muted">{title}</span>

@@ -12,6 +12,46 @@ export default async function AdminAnalyticsPage() {
 
   const { data: orders30 } = await supabase.from("orders").select("created_at,total_amount,payment_method,payment_status,seller_id").gte("created_at", since30);
 
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  /** Same calendar date/time in the previous month (day clamped if previous month is shorter). */
+  function sameMomentPreviousMonth(d: Date): Date {
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const targetDay = d.getDate();
+    const daysInPrevMonth = new Date(y, m, 0).getDate();
+    const day = Math.min(targetDay, daysInPrevMonth);
+    return new Date(y, m - 1, day, d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+  }
+  const prevPeriodEnd = sameMomentPreviousMonth(now);
+  const sincePrevCompare = prevMonthStart.toISOString();
+
+  const { data: ordersMonthCompare } = await supabase
+    .from("orders")
+    .select("created_at,total_amount,payment_status")
+    .gte("created_at", sincePrevCompare);
+
+  function isPaidOrder(row: { payment_status?: string | null }) {
+    return row.payment_status === "paid" || row.payment_status === "cod_collected";
+  }
+
+  let mtdOrderCount = 0;
+  let mtdRevenue = 0;
+  let prevPeriodOrderCount = 0;
+  let prevPeriodRevenue = 0;
+  for (const o of ordersMonthCompare ?? []) {
+    const t = new Date(o.created_at as string).getTime();
+    if (t >= monthStart.getTime() && t <= now.getTime()) {
+      mtdOrderCount += 1;
+      if (isPaidOrder(o)) mtdRevenue += Number(o.total_amount ?? 0);
+    }
+    if (t >= prevMonthStart.getTime() && t <= prevPeriodEnd.getTime()) {
+      prevPeriodOrderCount += 1;
+      if (isPaidOrder(o)) prevPeriodRevenue += Number(o.total_amount ?? 0);
+    }
+  }
+
   const byDay = new Map<string, number>();
   for (const o of orders30 ?? []) {
     const d = (o.created_at as string).slice(0, 10);
@@ -97,7 +137,20 @@ export default async function AdminAnalyticsPage() {
         <StatCard label="Popular payment (30d)" value={popularPay} />
       </div>
       <Card padding="md">
-        <AdminAnalyticsClient dailyOrders={dailyOrders} revenueTop={revenueTop} paySplit={paySplit} signups={signupsSeries} />
+        <AdminAnalyticsClient
+          dailyOrders={dailyOrders}
+          revenueTop={revenueTop}
+          paySplit={paySplit}
+          signups={signupsSeries}
+          periodCompare={{
+            labelCurrent: "Month to date",
+            labelPrevious: "Same calendar span last month",
+            currentOrders: mtdOrderCount,
+            currentRevenue: mtdRevenue,
+            previousOrders: prevPeriodOrderCount,
+            previousRevenue: prevPeriodRevenue,
+          }}
+        />
       </Card>
     </div>
   );

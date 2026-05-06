@@ -383,7 +383,7 @@ export default function OrderDetailPanel({
                 },
                 {
                   key: "prep",
-                  label: "Preparing",
+                  label: "In progress",
                   done: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
                   ts: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
                 },

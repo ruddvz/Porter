@@ -460,6 +460,32 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
 
       {tab === "bot" && (
         <Card padding="lg" className="space-y-4">
+          <div>
+            <p className="mb-2 text-label text-porter-text-muted">Customer preview (WhatsApp-style)</p>
+            <div className="rounded-xl border border-porter-bg-border bg-[#0B141A] p-4">
+              <div className="mx-auto max-w-sm">
+                <div className="mb-2 flex items-center gap-2 border-b border-white/10 pb-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-porter-green-500/20 text-sm font-bold text-porter-green-400">
+                    {(storeName || seller.store_name).slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{storeName || seller.store_name}</p>
+                    <p className="text-[11px] text-white/50">Business account · Preview</p>
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="max-w-[92%] whitespace-pre-wrap rounded-lg rounded-tl-sm bg-[#005C4B] px-3 py-2 text-[13px] leading-snug text-white shadow-sm">
+                    {seller.plan === "growth"
+                      ? botIntro.trim() || defaultIntro(storeName || seller.store_name)
+                      : defaultIntro(storeName || seller.store_name)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-porter-text-muted">
+              Starter stores use the default greeting. Growth stores use your custom intro when saved.
+            </p>
+          </div>
           {seller.plan === "growth" ? (
             <Input.Textarea id="bot-intro" label="Custom intro (Growth)" value={botIntro} onChange={(e) => setBotIntro(e.target.value)} rows={6} />
           ) : (

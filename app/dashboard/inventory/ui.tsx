@@ -3,7 +3,7 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Product, Seller } from "@/types";
 import { filterProductsByFuzzySearch } from "@/lib/fuzzy";
-import { isProductListedForBot } from "@/lib/product-catalog";
+import { isProductListedForBot, productListingHint } from "@/lib/product-catalog";
 import { checkGate } from "@/lib/plan-gates";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -42,6 +42,10 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
   const [modal, setModal] = useState<Product | "new" | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
+  const [bulkPriceInput, setBulkPriceInput] = useState("");
+  type SortKey = "name" | "price_asc" | "price_desc" | "stock_low" | "category";
+  const [sortBy, setSortBy] = useState<SortKey>("name");
 
   const categories = useMemo(() => {
     const s = new Set<string>();
@@ -55,6 +59,27 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
     const byCat = products.filter((p) => (category === "all" ? true : p.category === category));
     return filterProductsByFuzzySearch(byCat, search);
   }, [products, search, category]);
+
+  const sortedFiltered = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "price_asc":
+          return Number(a.price) - Number(b.price);
+        case "price_desc":
+          return Number(b.price) - Number(a.price);
+        case "stock_low":
+          return (a.stock_quantity ?? (a.in_stock ? 1 : 0)) - (b.stock_quantity ?? (b.in_stock ? 1 : 0));
+        case "category":
+          return (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+    return arr;
+  }, [filtered, sortBy]);
 
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
   const selectedCount = selectedIds.length;
@@ -76,6 +101,26 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
       toast(error.message, "error");
     } else {
       toast("Marked out of stock", "success");
+      setSelected({});
+    }
+  }
+
+  async function bulkSetPrice() {
+    const n = parseFloat(bulkPriceInput);
+    if (!selectedIds.length || !Number.isFinite(n) || n <= 0) {
+      toast("Enter a valid price greater than zero.", "error");
+      return;
+    }
+    const prev = products;
+    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, price: n } : x)));
+    const { error } = await supabase.from("products").update({ price: n }).in("id", selectedIds);
+    if (error) {
+      setProducts(prev);
+      toast(error.message, "error");
+    } else {
+      toast(`Updated price for ${selectedIds.length} products`, "success");
+      setBulkPriceOpen(false);
+      setBulkPriceInput("");
       setSelected({});
     }
   }
@@ -108,6 +153,19 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           className="md:max-w-md"
         />
         <div className="flex flex-wrap items-center gap-2">
+          <Input.Select
+            id="inv-sort"
+            label="Sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
+            className="min-w-[160px]"
+          >
+            <option value="name">Name (A–Z)</option>
+            <option value="category">Category</option>
+            <option value="price_asc">Price (low → high)</option>
+            <option value="price_desc">Price (high → low)</option>
+            <option value="stock_low">Stock (low first)</option>
+          </Input.Select>
           <Button type="button" variant={editMode ? "primary" : "secondary"} onClick={() => setEditMode((v) => !v)}>
             Edit mode
           </Button>
@@ -144,7 +202,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        {filtered.map((p) => (
+        {sortedFiltered.map((p) => (
           <Card key={p.id} variant="glow" padding="md" className="relative">
             {editMode && (
               <label className="absolute left-3 top-3 flex min-h-11 min-w-11 items-center">
@@ -209,6 +267,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
               <input
                 type="checkbox"
                 checked={isProductListedForBot(p)}
+                title={!isProductListedForBot(p) ? productListingHint(p) : "Shown in WhatsApp catalog when in stock and active"}
                 onChange={async (e) => {
                   const listed = e.target.checked;
                   const snapshot = {
@@ -229,16 +288,22 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
                 className="h-6 w-11 accent-porter-green-500"
               />
             </label>
+            {!isProductListedForBot(p) ? (
+              <p className="mt-2 text-xs leading-snug text-porter-text-muted">{productListingHint(p)}</p>
+            ) : null}
           </Card>
         ))}
       </div>
 
-      {filtered.length === 0 && <EmptyState title="No products match" description="Try a different search or category." />}
+      {sortedFiltered.length === 0 && <EmptyState title="No products match" description="Try a different search or category." />}
 
       {editMode && selectedCount > 0 && (
         <div className="fixed bottom-4 left-3 right-3 z-40 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-porter-bg-border bg-porter-bg-raised p-3 shadow-modal md:left-auto md:right-6 md:min-w-[420px]">
           <span className="text-sm font-semibold text-porter-text-primary">{selectedCount} selected</span>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="primary" onClick={() => setBulkPriceOpen(true)}>
+              Set price…
+            </Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => void bulkOutOfStock()}>
               Mark out of stock
             </Button>
@@ -263,6 +328,34 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           }}
         />
       )}
+
+      <Modal
+        open={bulkPriceOpen}
+        onClose={() => setBulkPriceOpen(false)}
+        title={`Set price for ${selectedCount} products`}
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setBulkPriceOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void bulkSetPrice()}>
+              Apply ₹{bulkPriceInput || "—"}
+            </Button>
+          </>
+        }
+      >
+        <Input.Text
+          id="bulk-price"
+          label="New price (₹ per unit)"
+          inputVariant="number"
+          value={bulkPriceInput}
+          onChange={(e) => setBulkPriceInput(e.target.value)}
+          min={0.01}
+          step={0.01}
+          placeholder="e.g. 45"
+        />
+        <p className="mt-2 text-xs text-porter-text-muted">Applies to every selected product. Unit (kg, piece, etc.) is unchanged.</p>
+      </Modal>
 
       <Modal
         open={bulkDeleteOpen}
