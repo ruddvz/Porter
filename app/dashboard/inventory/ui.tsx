@@ -44,6 +44,9 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
   const [bulkPriceInput, setBulkPriceInput] = useState("");
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
+  const [bulkCategoryPreset, setBulkCategoryPreset] = useState(() => PRESET_CATEGORIES[0] ?? "Other");
+  const [bulkCategoryCustom, setBulkCategoryCustom] = useState("");
   type SortKey = "name" | "price_asc" | "price_desc" | "stock_low" | "category";
   const [sortBy, setSortBy] = useState<SortKey>("name");
 
@@ -121,6 +124,23 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
       toast(`Updated price for ${selectedIds.length} products`, "success");
       setBulkPriceOpen(false);
       setBulkPriceInput("");
+      setSelected({});
+    }
+  }
+
+  async function bulkSetCategory() {
+    const cat = bulkCategoryCustom.trim() || bulkCategoryPreset;
+    if (!selectedIds.length) return;
+    const prev = products;
+    setProducts((p) => p.map((x) => (selectedIds.includes(x.id) ? { ...x, category: cat } : x)));
+    const { error } = await supabase.from("products").update({ category: cat }).in("id", selectedIds);
+    if (error) {
+      setProducts(prev);
+      toast(error.message, "error");
+    } else {
+      toast(`Updated category for ${selectedIds.length} products`, "success");
+      setBulkCategoryOpen(false);
+      setBulkCategoryCustom("");
       setSelected({});
     }
   }
@@ -301,6 +321,9 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
         <div className="fixed bottom-4 left-3 right-3 z-40 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-porter-bg-border bg-porter-bg-raised p-3 shadow-modal md:left-auto md:right-6 md:min-w-[420px]">
           <span className="text-sm font-semibold text-porter-text-primary">{selectedCount} selected</span>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={() => setBulkCategoryOpen(true)}>
+              Set category…
+            </Button>
             <Button type="button" size="sm" variant="primary" onClick={() => setBulkPriceOpen(true)}>
               Set price…
             </Button>
@@ -328,6 +351,44 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           }}
         />
       )}
+
+      <Modal
+        open={bulkCategoryOpen}
+        onClose={() => setBulkCategoryOpen(false)}
+        title={`Set category for ${selectedCount} products`}
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setBulkCategoryOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void bulkSetCategory()}>
+              Apply category
+            </Button>
+          </>
+        }
+      >
+        <Input.Select
+          id="bulk-cat-pre"
+          label="Category preset"
+          value={bulkCategoryPreset}
+          onChange={(e) => setBulkCategoryPreset(e.target.value)}
+        >
+          {PRESET_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </Input.Select>
+        <Input.Text
+          id="bulk-cat-custom"
+          className="mt-4"
+          label="Custom category (optional)"
+          value={bulkCategoryCustom}
+          onChange={(e) => setBulkCategoryCustom(e.target.value)}
+          placeholder="Overrides preset when filled"
+          hint="Leave blank to use the preset above."
+        />
+      </Modal>
 
       <Modal
         open={bulkPriceOpen}

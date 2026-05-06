@@ -7,6 +7,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { Table } from "@/components/ui/Table";
 import type { Order, OrderItem, Seller } from "@/types";
 import { useMemo, useState } from "react";
+import { pctDelta } from "@/lib/month-compare";
 import {
   Bar,
   BarChart,
@@ -37,6 +38,7 @@ export default function AnalyticsClient({
   seller,
   initialOrders,
   stats,
+  periodCompare,
 }: {
   seller: Seller;
   initialOrders: OrderRow[];
@@ -47,12 +49,35 @@ export default function AnalyticsClient({
     totalCustomers: number;
     productCount: number;
   };
+  periodCompare: {
+    labelCurrent: string;
+    labelPrevious: string;
+    currentOrders: number;
+    currentRevenue: number;
+    previousOrders: number;
+    previousRevenue: number;
+  };
 }) {
   const [range, setRange] = useState<"day" | "week" | "month">("day");
+  const [chartScope, setChartScope] = useState<"plan_window" | "this_month" | "last_month">("plan_window");
+
+  const scopedOrders = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    if (chartScope === "plan_window") return initialOrders;
+    return initialOrders.filter((o) => {
+      const t = new Date(o.created_at).getTime();
+      if (chartScope === "this_month") return t >= monthStart.getTime() && t <= now.getTime();
+      if (chartScope === "last_month") return t >= prevMonthStart.getTime() && t <= prevMonthEnd.getTime();
+      return true;
+    });
+  }, [initialOrders, chartScope]);
 
   const paidOrders = useMemo(
-    () => initialOrders.filter((o) => o.payment_status === "paid" || o.payment_status === "cod_collected"),
-    [initialOrders],
+    () => scopedOrders.filter((o) => o.payment_status === "paid" || o.payment_status === "cod_collected"),
+    [scopedOrders],
   );
 
   const revenueSeries = useMemo(() => {
@@ -84,7 +109,7 @@ export default function AnalyticsClient({
 
   const customersReturning = useMemo(() => {
     const byPhone = new Map<string, number>();
-    for (const o of initialOrders) {
+    for (const o of scopedOrders) {
       const n = byPhone.get(o.customer_phone) ?? 0;
       byPhone.set(o.customer_phone, n + 1);
     }
@@ -95,18 +120,25 @@ export default function AnalyticsClient({
       else neu++;
     }
     return { newish: neu, returning: ret };
-  }, [initialOrders]);
+  }, [scopedOrders]);
 
   const peakHourBuckets = useMemo(() => {
     const hrs = Array.from({ length: 24 }, (_, hour) => ({ hour, orders: 0 }));
-    for (const o of initialOrders) {
+    for (const o of scopedOrders) {
       const h = new Date(o.created_at).getHours();
       hrs[h].orders += 1;
     }
     return hrs;
-  }, [initialOrders]);
+  }, [scopedOrders]);
 
   const peakMax = useMemo(() => Math.max(1, ...peakHourBuckets.map((x) => x.orders)), [peakHourBuckets]);
+
+  const scopeHint =
+    chartScope === "plan_window"
+      ? "Charts use every order in your plan history window."
+      : chartScope === "this_month"
+        ? "Charts use orders from the 1st of this month through now."
+        : "Charts use the previous calendar month only.";
 
   return (
     <div className="space-y-6 px-3 py-4 md:px-6 md:py-6">
@@ -125,17 +157,72 @@ export default function AnalyticsClient({
         <StatCard label="Customers" value={stats.totalCustomers} />
       </div>
 
-      <Card padding="md" className="flex flex-wrap gap-2">
-        <span className="text-label text-porter-text-muted self-center">Group by</span>
-        <Button type="button" size="sm" variant={range === "day" ? "primary" : "secondary"} onClick={() => setRange("day")}>
-          Daily
-        </Button>
-        <Button type="button" size="sm" variant={range === "week" ? "primary" : "secondary"} onClick={() => setRange("week")}>
-          Weekly
-        </Button>
-        <Button type="button" size="sm" variant={range === "month" ? "primary" : "secondary"} onClick={() => setRange("month")}>
-          Monthly
-        </Button>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card padding="md">
+          <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · orders</p>
+          <p className="mt-1 font-display text-2xl text-porter-text-primary">{periodCompare.currentOrders}</p>
+          <p className="mt-2 text-xs text-porter-text-muted">
+            {periodCompare.labelPrevious}: {periodCompare.previousOrders}{" "}
+            <span className="font-medium text-porter-text-secondary">
+              ({pctDelta(periodCompare.currentOrders, periodCompare.previousOrders)})
+            </span>
+          </p>
+        </Card>
+        <Card padding="md">
+          <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · paid revenue</p>
+          <p className="mt-1 font-display text-2xl text-porter-text-primary">
+            ₹{Math.round(periodCompare.currentRevenue).toLocaleString("en-IN")}
+          </p>
+          <p className="mt-2 text-xs text-porter-text-muted">
+            {periodCompare.labelPrevious}: ₹{Math.round(periodCompare.previousRevenue).toLocaleString("en-IN")}{" "}
+            <span className="font-medium text-porter-text-secondary">
+              ({pctDelta(periodCompare.currentRevenue, periodCompare.previousRevenue)})
+            </span>
+          </p>
+        </Card>
+      </div>
+
+      <Card padding="md" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-label text-porter-text-muted">Chart data</span>
+          <Button
+            type="button"
+            size="sm"
+            variant={chartScope === "plan_window" ? "primary" : "secondary"}
+            onClick={() => setChartScope("plan_window")}
+          >
+            Plan window
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={chartScope === "this_month" ? "primary" : "secondary"}
+            onClick={() => setChartScope("this_month")}
+          >
+            This month
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={chartScope === "last_month" ? "primary" : "secondary"}
+            onClick={() => setChartScope("last_month")}
+          >
+            Last month
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-porter-bg-border pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+          <span className="text-label text-porter-text-muted">Group by</span>
+          <Button type="button" size="sm" variant={range === "day" ? "primary" : "secondary"} onClick={() => setRange("day")}>
+            Daily
+          </Button>
+          <Button type="button" size="sm" variant={range === "week" ? "primary" : "secondary"} onClick={() => setRange("week")}>
+            Weekly
+          </Button>
+          <Button type="button" size="sm" variant={range === "month" ? "primary" : "secondary"} onClick={() => setRange("month")}>
+            Monthly
+          </Button>
+        </div>
+        <p className="w-full text-xs text-porter-text-muted">{scopeHint}</p>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -172,7 +259,7 @@ export default function AnalyticsClient({
 
       <Card padding="md">
         <h2 className="text-title">Peak hours (local)</h2>
-        <p className="mt-1 text-xs text-porter-text-muted">Order volume by hour of day in your analytics window.</p>
+        <p className="mt-1 text-xs text-porter-text-muted">{scopeHint}</p>
         <div className="mt-4 grid gap-1" style={{ gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
           {peakHourBuckets.map((b) => (
             <div key={b.hour} className="flex flex-col items-center gap-1">
@@ -189,6 +276,7 @@ export default function AnalyticsClient({
 
       <Card padding="md">
         <h2 className="text-title">Top products</h2>
+        <p className="mt-1 text-xs text-porter-text-muted">Paid orders in the selected chart data scope.</p>
         <Table
           className="mt-4"
           columns={[
@@ -204,7 +292,7 @@ export default function AnalyticsClient({
       </Card>
 
       <Card padding="md">
-        <h2 className="text-title">Customers in range</h2>
+        <h2 className="text-title">Customers in scope</h2>
         <p className="mt-2 text-body text-porter-text-secondary">
           Unique phones with a single order: {customersReturning.newish}. With repeat orders: {customersReturning.returning}.
         </p>

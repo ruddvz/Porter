@@ -16,6 +16,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { pctDelta } from "@/lib/month-compare";
+
 const COLORS = ["#25D366", "#FF6B35", "#60A5FA", "#F59E0B", "#A3E635"];
 
 function pctDelta(cur: number, prev: number): string {
