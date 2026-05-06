@@ -2,9 +2,15 @@
 
 > **What this is:** A clear, prioritized plan for making Porter better — across UI/UX, system design, reliability, and business logic. It reviews the two open PRs, the current codebase state, and lists every gap found, with a simplified execution roadmap at the end.
 
+## Roadmap status — complete
+
+**Phases 1–4** from this document are implemented on **`main`** (merged via PR **#9**, May 2026). Remaining items below “Quick Reference” are **optional backlog** (nice-to-haves), not blockers.
+
+**After pulling `main`, apply Supabase migrations through `012_realtime_platform_events.sql`** (see `README.md`). Enable **GitHub Pages** (Actions) if you want the static preview from `/docs`.
+
 ---
 
-## Open PRs — What They Bring
+## Open PRs — What They Bring (historical context)
 
 ### PR #8 — Complete Master Plan (migration 006, analytics, PWA, push, plan gates, kanban DnD)
 The biggest PR in the repo. It introduces:
@@ -354,4 +360,4 @@ These are bugs or missing features that break the core product promise.
 
 ---
 
-*Last updated: May 2026. Reflects current `main` branch state and open PRs #7 and #8.*
+*Last updated: May 2026. Roadmap Phases 1–4 delivered on `main`; backlog items below are optional follow-ups.*
