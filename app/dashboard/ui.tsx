@@ -32,8 +32,10 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Check, MessageCircle, Package, Truck, X } from "lucide-react";
+import type { MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { cn } from "@/lib/cn";
 
 function startOfToday() {
   const d = new Date();
@@ -77,7 +79,7 @@ function columnLabel(s: KanbanColumnId): string {
     case "awaiting_payment":
       return "Awaiting payment";
     case "preparing":
-      return "Preparing";
+      return "In progress";
     case "paid":
       return "Paid";
     case "out_for_delivery":
@@ -95,6 +97,137 @@ function waLink(phone: string, text: string) {
   const digits = phone.replace(/\D/g, "");
   const n = digits.length === 10 ? `91${digits}` : digits;
   return `https://wa.me/${n}?text=${encodeURIComponent(text)}`;
+}
+
+/** Sort key for mobile swimlane: workflow order, cancelled last. */
+function workflowRank(o: OrderWithItems): number {
+  if (o.status === "cancelled") return 900;
+  if (o.status === "delivered") return 800;
+  if (o.status === "out_for_delivery") return 700;
+  if (o.status === "paid") return 600;
+  if (o.status === "preparing") return 500;
+  if (o.status === "confirmed") return 400;
+  if (o.status === "pending") return isAwaitingPayment(o) ? 210 : 200;
+  return 850;
+}
+
+function listStageLabel(o: OrderWithItems): string {
+  if (o.status === "cancelled") return "Cancelled";
+  if (isAwaitingPayment(o)) return "Awaiting payment";
+  return columnLabel(o.status as KanbanColumnId);
+}
+
+function listAccentClass(o: OrderWithItems): string {
+  if (o.status === "cancelled") return "border-l-porter-status-cancelled";
+  if (isAwaitingPayment(o)) return "border-l-porter-orange-500";
+  switch (o.status) {
+    case "pending":
+      return "border-l-amber-400";
+    case "confirmed":
+      return "border-l-sky-400";
+    case "preparing":
+      return "border-l-teal-400";
+    case "paid":
+      return "border-l-porter-green-500";
+    case "out_for_delivery":
+      return "border-l-violet-400";
+    case "delivered":
+      return "border-l-emerald-600";
+    default:
+      return "border-l-porter-bg-border";
+  }
+}
+
+function stopRowClick(fn: () => void) {
+  return (e: MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+}
+
+/** Shared quick actions for kanban cards and mobile swimlane rows. */
+function OrderRowQuickActions({
+  order,
+  onPatch,
+}: {
+  order: OrderWithItems;
+  onPatch: (u: Partial<Order>) => void;
+}) {
+  const prefill = `Hi${order.customer_name ? ` ${order.customer_name}` : ""}, regarding order #${order.id.slice(0, 8)} — `;
+
+  return (
+    <>
+      <Button
+        size="sm"
+        type="button"
+        variant="secondary"
+        onClick={stopRowClick(() => window.open(waLink(order.customer_phone, prefill), "_blank", "noopener,noreferrer"))}
+      >
+        <MessageCircle className="h-4 w-4" />
+        WhatsApp
+      </Button>
+      {order.status === "pending" && (
+        <>
+          <Button size="sm" type="button" onClick={stopRowClick(() => onPatch({ status: "confirmed" }))}>
+            <Check className="h-4 w-4" />
+            Confirm
+          </Button>
+          <Button
+            size="sm"
+            type="button"
+            variant="ghost"
+            className="text-porter-status-cancelled hover:text-porter-status-cancelled"
+            onClick={stopRowClick(() => onPatch({ status: "cancelled" }))}
+          >
+            <X className="h-4 w-4" />
+            Cancel
+          </Button>
+          {isAwaitingPayment(order) && (
+            <Button
+              size="sm"
+              type="button"
+              variant="secondary"
+              onClick={stopRowClick(() => onPatch({ payment_status: "paid", status: "preparing" }))}
+            >
+              Mark paid
+            </Button>
+          )}
+        </>
+      )}
+      {(order.status === "confirmed" || order.status === "paid") && (
+        <Button size="sm" type="button" onClick={stopRowClick(() => onPatch({ status: "preparing" }))}>
+          <Package className="h-4 w-4" />
+          In progress
+        </Button>
+      )}
+      {(order.status === "preparing" || order.status === "paid") && (
+        <Button size="sm" type="button" onClick={stopRowClick(() => onPatch({ status: "out_for_delivery" }))}>
+          <Truck className="h-4 w-4" />
+          Dispatch
+        </Button>
+      )}
+      {order.status === "out_for_delivery" && (
+        <Button
+          size="sm"
+          type="button"
+          onClick={stopRowClick(() => onPatch({ status: "delivered", delivered_at: new Date().toISOString() }))}
+        >
+          <Check className="h-4 w-4" />
+          Delivered
+        </Button>
+      )}
+      {order.payment_method === "cod" && order.payment_status === "cod_pending" && (
+        <Button
+          size="sm"
+          type="button"
+          className="bg-porter-orange-500 hover:bg-porter-orange-600"
+          onClick={stopRowClick(() => onPatch({ payment_status: "cod_collected" }))}
+        >
+          Mark cash collected
+        </Button>
+      )}
+    </>
+  );
 }
 
 /** Live kanban: 6 workflow columns + cancelled, drag-and-drop, realtime, gated sound. */
@@ -118,6 +251,7 @@ export default function LiveOrdersBoard({
   const [from, setFrom] = useState(defaultFromIso);
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [boardSearch, setBoardSearch] = useState("");
+  const [mobileLayout, setMobileLayout] = useState<"board" | "list">("list");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
@@ -195,6 +329,17 @@ export default function LiveOrdersBoard({
       );
     });
   }, [inRange, boardSearch]);
+
+  const sortedSwimlaneOrders = useMemo(() => {
+    const arr = [...searchFiltered];
+    arr.sort((a, b) => {
+      const ra = workflowRank(a);
+      const rb = workflowRank(b);
+      if (ra !== rb) return ra - rb;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    return arr;
+  }, [searchFiltered]);
 
   const board = useMemo(() => {
     const cancelled = searchFiltered.filter((o) => o.status === "cancelled");
@@ -318,8 +463,37 @@ export default function LiveOrdersBoard({
           />
         </Card>
 
+        <div className="mt-4 flex rounded-xl border border-porter-bg-border bg-porter-bg-surface p-1 xl:hidden">
+          <button
+            type="button"
+            className={cn(
+              "min-h-11 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors",
+              mobileLayout === "board" ? "bg-porter-green-500/20 text-porter-green-400" : "text-porter-text-secondary",
+            )}
+            onClick={() => setMobileLayout("board")}
+          >
+            Board
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "min-h-11 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors",
+              mobileLayout === "list" ? "bg-porter-green-500/20 text-porter-green-400" : "text-porter-text-secondary",
+            )}
+            onClick={() => setMobileLayout("list")}
+          >
+            List
+          </button>
+        </div>
+
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-8 xl:gap-2" ref={boardRef}>
+          <div
+            className={cn(
+              "mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] xl:grid xl:snap-none xl:grid-cols-8 xl:gap-2 xl:overflow-visible xl:pb-0 [&::-webkit-scrollbar]:hidden",
+              mobileLayout === "list" && "max-xl:hidden",
+            )}
+            ref={boardRef}
+          >
             {COLUMN_ORDER.map((col) => (
               <DroppableColumn key={col} id={col} title={columnLabel(col)} count={board[col].length}>
                 {board[col].length === 0 ? (
@@ -356,6 +530,74 @@ export default function LiveOrdersBoard({
             </DroppableColumn>
           </div>
         </DndContext>
+
+        <div
+          className={cn(
+            "mt-6 space-y-3 xl:hidden",
+            mobileLayout === "board" && "hidden",
+          )}
+        >
+          {sortedSwimlaneOrders.length === 0 ? (
+            <EmptyState title="No orders in range" description="Adjust the date range or clear search." />
+          ) : (
+            sortedSwimlaneOrders.map((o) => {
+              const pay = paymentBadge(o);
+              const st = orderStatusBadge(o.status);
+              const urgency = pendingTimeUrgency(o.status, o.created_at, nowMs);
+              const showActions = o.status !== "delivered" && o.status !== "cancelled";
+              return (
+                <article
+                  key={o.id}
+                  className={cn(
+                    "overflow-hidden rounded-xl border border-porter-bg-border bg-porter-bg-surface shadow-card transition-[box-shadow,transform] hover:border-porter-green-500/25 hover:shadow-raised",
+                    "border-l-4",
+                    listAccentClass(o),
+                    newIds.has(o.id) && "animate-porter-slide-in-right shadow-glow ring-1 ring-porter-green-500/20",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPanel(o)}
+                    className="w-full px-4 pb-2 pt-3 text-left transition-transform active:scale-[0.99]"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-porter-text-primary">{o.customer_name || "Customer"}</p>
+                        <p className="text-mono text-xs text-porter-text-muted">{o.customer_phone}</p>
+                      </div>
+                      <span className="shrink-0 font-display text-lg text-porter-text-primary">{formatCurrencyInr(o.total_amount)}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge kind="status" variant={st.variant} label={listStageLabel(o)} size="sm" />
+                      <Badge kind="status" variant={pay.statusVariant} label={pay.label} size="sm" />
+                      <span
+                        className={cn(
+                          "text-mono text-xs",
+                          urgency === "critical"
+                            ? "text-porter-status-cancelled"
+                            : urgency === "warn"
+                              ? "text-porter-orange-500"
+                              : "text-porter-text-muted",
+                        )}
+                      >
+                        {timeAgoLabel(o.created_at, nowMs)}
+                      </span>
+                    </div>
+                    <p className="mt-2 truncate text-sm text-porter-text-secondary">{itemSummaryLine(o.order_items)}</p>
+                  </button>
+                  {showActions ? (
+                    <div
+                      className="flex flex-wrap gap-1 border-t border-porter-bg-border bg-porter-bg-base/40 px-2 py-2"
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <OrderRowQuickActions order={o} onPatch={(u) => void patchOrder(o, u)} />
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {panel && (
@@ -386,7 +628,12 @@ function DroppableColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className={isOver ? "ring-2 ring-porter-green-500/40 ring-offset-2 ring-offset-porter-bg-base rounded-xl" : ""}>
+    <div
+      ref={setNodeRef}
+      className={`w-[min(90vw,320px)] shrink-0 snap-start xl:w-auto xl:min-w-0 xl:snap-align-none ${
+        isOver ? "ring-2 ring-porter-green-500/40 ring-offset-2 ring-offset-porter-bg-base rounded-xl" : ""
+      }`}
+    >
       <Card padding="sm" className="flex max-h-[calc(100vh-18rem)] min-h-[200px] flex-col xl:max-h-[calc(100vh-14rem)]">
         <div className="flex shrink-0 items-center justify-between border-b border-porter-bg-border px-2 py-2">
           <span className="text-label text-porter-text-muted">{title}</span>
@@ -428,81 +675,7 @@ function DraggableBoardCard({
   const pay = paymentBadge(order);
   const status = orderStatusBadge(order.status);
   const urgency = pendingTimeUrgency(order.status, order.created_at, nowMs);
-  const prefill = `Hi${order.customer_name ? ` ${order.customer_name}` : ""}, regarding order #${order.id.slice(0, 8)} — `;
-
-  const actions = (
-    <>
-      <Button
-        size="sm"
-        type="button"
-        variant="secondary"
-        onClick={() => window.open(waLink(order.customer_phone, prefill), "_blank", "noopener,noreferrer")}
-      >
-        <MessageCircle className="h-4 w-4" />
-        WhatsApp
-      </Button>
-      {order.status === "pending" && (
-        <>
-          <Button size="sm" type="button" onClick={() => onPatch({ status: "confirmed" })}>
-            <Check className="h-4 w-4" />
-            Confirm
-          </Button>
-          <Button
-            size="sm"
-            type="button"
-            variant="ghost"
-            className="text-porter-status-cancelled hover:text-porter-status-cancelled"
-            onClick={() => onPatch({ status: "cancelled" })}
-          >
-            <X className="h-4 w-4" />
-            Cancel
-          </Button>
-          {isAwaitingPayment(order) && (
-            <Button
-              size="sm"
-              type="button"
-              variant="secondary"
-              onClick={() => onPatch({ payment_status: "paid", status: "preparing" })}
-            >
-              Mark paid
-            </Button>
-          )}
-        </>
-      )}
-      {(order.status === "confirmed" || order.status === "paid") && (
-        <Button size="sm" type="button" onClick={() => onPatch({ status: "preparing" })}>
-          <Package className="h-4 w-4" />
-          Preparing
-        </Button>
-      )}
-      {(order.status === "preparing" || order.status === "paid") && (
-        <Button size="sm" type="button" onClick={() => onPatch({ status: "out_for_delivery" })}>
-          <Truck className="h-4 w-4" />
-          Dispatch
-        </Button>
-      )}
-      {order.status === "out_for_delivery" && (
-        <Button
-          size="sm"
-          type="button"
-          onClick={() => onPatch({ status: "delivered", delivered_at: new Date().toISOString() })}
-        >
-          <Check className="h-4 w-4" />
-          Delivered
-        </Button>
-      )}
-      {order.payment_method === "cod" && order.payment_status === "cod_pending" && (
-        <Button
-          size="sm"
-          type="button"
-          className="bg-porter-orange-500 hover:bg-porter-orange-600"
-          onClick={() => onPatch({ payment_status: "cod_collected" })}
-        >
-          Mark cash collected
-        </Button>
-      )}
-    </>
-  );
+  const actions = <OrderRowQuickActions order={order} onPatch={onPatch} />;
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>

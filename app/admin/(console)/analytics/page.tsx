@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
 import AdminAnalyticsClient from "./ui";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { accumulateMtdVersusPriorMonth } from "@/lib/month-compare";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,20 @@ export default async function AdminAnalyticsPage() {
   const since90 = new Date(Date.now() - 90 * 86400000).toISOString();
 
   const { data: orders30 } = await supabase.from("orders").select("created_at,total_amount,payment_method,payment_status,seller_id").gte("created_at", since30);
+
+  const now = new Date();
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const sincePrevCompare = prevMonthStart.toISOString();
+
+  const { data: ordersMonthCompare } = await supabase
+    .from("orders")
+    .select("created_at,total_amount,payment_status")
+    .gte("created_at", sincePrevCompare);
+
+  const { mtdOrderCount, mtdRevenue, prevPeriodOrderCount, prevPeriodRevenue } = accumulateMtdVersusPriorMonth(
+    ordersMonthCompare ?? [],
+    now,
+  );
 
   const byDay = new Map<string, number>();
   for (const o of orders30 ?? []) {
@@ -97,7 +112,20 @@ export default async function AdminAnalyticsPage() {
         <StatCard label="Popular payment (30d)" value={popularPay} />
       </div>
       <Card padding="md">
-        <AdminAnalyticsClient dailyOrders={dailyOrders} revenueTop={revenueTop} paySplit={paySplit} signups={signupsSeries} />
+        <AdminAnalyticsClient
+          dailyOrders={dailyOrders}
+          revenueTop={revenueTop}
+          paySplit={paySplit}
+          signups={signupsSeries}
+          periodCompare={{
+            labelCurrent: "Month to date",
+            labelPrevious: "Same calendar span last month",
+            currentOrders: mtdOrderCount,
+            currentRevenue: mtdRevenue,
+            previousOrders: prevPeriodOrderCount,
+            previousRevenue: prevPeriodRevenue,
+          }}
+        />
       </Card>
     </div>
   );

@@ -16,6 +16,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { pctDelta } from "@/lib/month-compare";
+
 const COLORS = ["#25D366", "#FF6B35", "#60A5FA", "#F59E0B", "#A3E635"];
 
 export default function AdminAnalyticsClient({
@@ -23,14 +25,45 @@ export default function AdminAnalyticsClient({
   revenueTop,
   paySplit,
   signups,
+  periodCompare,
 }: {
   dailyOrders: { date: string; count: number }[];
   revenueTop: { name: string; revenue: number }[];
   paySplit: { name: string; value: number }[];
   signups: { date: string; count: number }[];
+  periodCompare: {
+    labelCurrent: string;
+    labelPrevious: string;
+    currentOrders: number;
+    currentRevenue: number;
+    previousOrders: number;
+    previousRevenue: number;
+  };
 }) {
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="space-y-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg border border-porter-bg-border bg-porter-bg-surface p-4">
+          <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · orders</p>
+          <p className="mt-1 font-display text-2xl text-porter-text-primary">{periodCompare.currentOrders}</p>
+          <p className="mt-2 text-xs text-porter-text-muted">
+            {periodCompare.labelPrevious}: {periodCompare.previousOrders}{" "}
+            <span className="font-medium text-porter-text-secondary">({pctDelta(periodCompare.currentOrders, periodCompare.previousOrders)})</span>
+          </p>
+        </div>
+        <div className="rounded-lg border border-porter-bg-border bg-porter-bg-surface p-4">
+          <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · paid revenue</p>
+          <p className="mt-1 font-display text-2xl text-porter-text-primary">
+            ₹{Math.round(periodCompare.currentRevenue).toLocaleString("en-IN")}
+          </p>
+          <p className="mt-2 text-xs text-porter-text-muted">
+            {periodCompare.labelPrevious}: ₹{Math.round(periodCompare.previousRevenue).toLocaleString("en-IN")}{" "}
+            <span className="font-medium text-porter-text-secondary">({pctDelta(periodCompare.currentRevenue, periodCompare.previousRevenue)})</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
       <div className="h-72">
         <h3 className="mb-2 text-title">Daily orders (30d)</h3>
         <ResponsiveContainer width="100%" height="100%">
@@ -84,6 +117,7 @@ export default function AdminAnalyticsClient({
           </LineChart>
         </ResponsiveContainer>
       </div>
+    </div>
     </div>
   );
 }
