@@ -16,14 +16,9 @@ import {
   YAxis,
 } from "recharts";
 
-const COLORS = ["#25D366", "#FF6B35", "#60A5FA", "#F59E0B", "#A3E635"];
+import { pctDelta } from "@/lib/month-compare";
 
-function pctDelta(cur: number, prev: number): string {
-  if (prev === 0) return cur === 0 ? "flat" : "new";
-  const d = ((cur - prev) / prev) * 100;
-  const sign = d >= 0 ? "+" : "";
-  return `${sign}${d.toFixed(1)}%`;
-}
+const COLORS = ["#25D366", "#FF6B35", "#60A5FA", "#F59E0B", "#A3E635"];
 
 export default function AdminAnalyticsClient({
   dailyOrders,

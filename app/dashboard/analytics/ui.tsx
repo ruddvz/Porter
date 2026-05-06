@@ -7,6 +7,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { Table } from "@/components/ui/Table";
 import type { Order, OrderItem, Seller } from "@/types";
 import { useMemo, useState } from "react";
+import { pctDelta } from "@/lib/month-compare";
 import {
   Bar,
   BarChart,
@@ -37,6 +38,7 @@ export default function AnalyticsClient({
   seller,
   initialOrders,
   stats,
+  periodCompare,
 }: {
   seller: Seller;
   initialOrders: OrderRow[];
@@ -46,6 +48,14 @@ export default function AnalyticsClient({
     pendingOrders: number;
     totalCustomers: number;
     productCount: number;
+  };
+  periodCompare: {
+    labelCurrent: string;
+    labelPrevious: string;
+    currentOrders: number;
+    currentRevenue: number;
+    previousOrders: number;
+    previousRevenue: number;
   };
 }) {
   const [range, setRange] = useState<"day" | "week" | "month">("day");
@@ -123,6 +133,31 @@ export default function AnalyticsClient({
         <StatCard label="Today's revenue" value={Math.round(stats.todayRevenue).toLocaleString("en-IN")} prefix="₹" />
         <StatCard label="Pending orders" value={stats.pendingOrders} valueTone={stats.pendingOrders > 0 ? "warning" : "default"} />
         <StatCard label="Customers" value={stats.totalCustomers} />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card padding="md">
+          <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · orders</p>
+          <p className="mt-1 font-display text-2xl text-porter-text-primary">{periodCompare.currentOrders}</p>
+          <p className="mt-2 text-xs text-porter-text-muted">
+            {periodCompare.labelPrevious}: {periodCompare.previousOrders}{" "}
+            <span className="font-medium text-porter-text-secondary">
+              ({pctDelta(periodCompare.currentOrders, periodCompare.previousOrders)})
+            </span>
+          </p>
+        </Card>
+        <Card padding="md">
+          <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · paid revenue</p>
+          <p className="mt-1 font-display text-2xl text-porter-text-primary">
+            ₹{Math.round(periodCompare.currentRevenue).toLocaleString("en-IN")}
+          </p>
+          <p className="mt-2 text-xs text-porter-text-muted">
+            {periodCompare.labelPrevious}: ₹{Math.round(periodCompare.previousRevenue).toLocaleString("en-IN")}{" "}
+            <span className="font-medium text-porter-text-secondary">
+              ({pctDelta(periodCompare.currentRevenue, periodCompare.previousRevenue)})
+            </span>
+          </p>
+        </Card>
       </div>
 
       <Card padding="md" className="flex flex-wrap gap-2">
