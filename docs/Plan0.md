@@ -4,6 +4,8 @@
 > **Context for Claude Code:** This is the `ruddvz/Porter` repository — a multi-tenant WhatsApp-commerce SaaS where sellers manage inventory, receive orders via the Meta WhatsApp Business API, and collect payments through Razorpay. The stack is Next.js 14 App Router · Supabase (auth + postgres + realtime) · Tailwind CSS · TypeScript · dnd-kit · Recharts · Fuse.js · Web Push · Google Gemini AI.
 >
 > Your task is a **full UI/UX overhaul**: pixel-perfect styling, real working interactions (no fake/placeholder code), and a polished installable PWA that works identically on mobile and desktop.
+>
+> **Repo status:** [Plan0-implementation-status.md](Plan0-implementation-status.md) lists what is already built in this codebase vs this spec (git history alone is misleading).
 
 ---
 
