@@ -1,15 +1,24 @@
 /* Porter seller dashboard — minimal offline shell */
-const CACHE = "porter-seller-v1";
+const CACHE = "porter-seller-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(["/dashboard", "/manifest.json"]).catch(() => undefined))
+    caches
+      .open(CACHE)
+      .then((cache) =>
+        cache.addAll(["/dashboard", "/offline", "/manifest.json"]).catch(() => undefined)
+      )
   );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -28,8 +37,21 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
+
+  const accept = event.request.headers.get("accept") ?? "";
+  const isHtmlNavigation =
+    event.request.mode === "navigate" || (event.request.method === "GET" && accept.includes("text/html"));
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((c) => c || caches.match("/dashboard")))
+    fetch(event.request)
+      .then((res) => res)
+      .catch(() =>
+        caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (isHtmlNavigation) return caches.match("/offline");
+          return caches.match("/dashboard");
+        })
+      )
   );
 });
 

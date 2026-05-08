@@ -1,6 +1,5 @@
 /** Best-effort parse of "kal subah", "tomorrow morning" → scheduled ISO (Asia/Kolkata–biased). */
 export function parseScheduledDeliveryHint(text: string): string | null {
-  const t = text.toLowerCase();
   const hasTomorrow = /\b(kal|कल|કાલે|tomorrow|agle din|अगले)\b/i.test(text);
   const hasMorning = /\b(subah|सुबह|સવારे|morning)\b/i.test(text);
   const hasEvening = /\b(sham|शाम|સાંજ|evening)\b/i.test(text);

@@ -1,6 +1,6 @@
 import type { Seller, WorkingHoursMap } from "@/types";
 
-const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+type WeekdayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
 function parseHm(s: string): { h: number; m: number } | null {
   const m = s.trim().match(/^(\d{1,2}):(\d{2})$/);
@@ -30,10 +30,10 @@ export function minutesNowInTimeZone(timeZone: string): number | null {
   }
 }
 
-function dayKeyInTimeZone(timeZone: string): (typeof DAY_KEYS)[number] | null {
+function dayKeyInTimeZone(timeZone: string): WeekdayKey | null {
   try {
     const wd = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(new Date());
-    const map: Record<string, (typeof DAY_KEYS)[number]> = {
+    const map: Record<string, WeekdayKey> = {
       Sun: "sun",
       Mon: "mon",
       Tue: "tue",
