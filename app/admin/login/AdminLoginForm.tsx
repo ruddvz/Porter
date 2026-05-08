@@ -31,7 +31,7 @@ export default function AdminLoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
+    <main id="main-content" className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
       <h1 className="font-display text-5xl tracking-wide text-porter-status-cancelled">PORTER ADMIN</h1>
       <p className="mt-2 text-sm text-porter-text-secondary">Internal access only</p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-xl border border-porter-bg-border bg-porter-bg-surface p-6 shadow-card">

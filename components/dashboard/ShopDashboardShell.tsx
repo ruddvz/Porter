@@ -88,7 +88,7 @@ export default function ShopDashboardShell({
           onOpenNav={() => setMobileNav(true)}
           impersonating={impersonating}
         />
-        <main className="min-h-[calc(100vh-3.5rem)] space-y-4 pb-24">
+        <main id="main-content" className="min-h-[calc(100vh-3.5rem)] space-y-4 pb-24">
           <div className="px-3 pt-3 md:px-6 md:pt-4">
             <PushPrompt seller={seller} />
           </div>

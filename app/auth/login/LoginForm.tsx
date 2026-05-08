@@ -31,7 +31,7 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
+    <main id="main-content" className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
       <h1 className="font-['Bebas_Neue',sans-serif] text-5xl tracking-wide text-[#25D366]">PORTER</h1>
       <p className="mt-2 text-sm text-white/70">Seller login</p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-xl border border-white/10 bg-[#111A14] p-6">

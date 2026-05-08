@@ -24,7 +24,7 @@ export default function DesignSystemPage() {
 
   return (
     <div className="min-h-screen bg-porter-bg-base pb-24 pt-6 text-porter-text-primary">
-      <div className="mx-auto max-w-5xl space-y-10 px-4">
+      <main id="main-content" className="mx-auto max-w-5xl space-y-10 px-4">
         <header>
           <h1 className="text-display text-porter-green-500">PORTER</h1>
           <p className="mt-2 text-heading">Design system</p>
@@ -211,7 +211,7 @@ export default function DesignSystemPage() {
             On large screens the fixed sidebar sits to the left; on small screens use the button to open the drawer.
           </p>
         </section>
-      </div>
+      </main>
     </div>
   );
 }
