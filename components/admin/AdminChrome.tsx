@@ -17,7 +17,7 @@ export default function AdminChrome({ email, children }: { email: string; childr
       <div className="min-h-screen flex-1 lg:pl-60">
         <AdminTopBar email={email} />
         <AdminPushPrompt />
-        <main className="p-4 md:p-6">{children}</main>
+        <main id="main-content" className="p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

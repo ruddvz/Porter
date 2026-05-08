@@ -4,6 +4,7 @@ import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { Table } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
@@ -45,6 +46,7 @@ export default function OrderHistoryClient({
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialOrders.length >= pageSize);
+  const [cancelTarget, setCancelTarget] = useState<OrderWithItems | null>(null);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
@@ -245,14 +247,8 @@ export default function OrderHistoryClient({
                     <button
                       type="button"
                       className="block w-full px-3 py-2 text-left text-sm text-porter-status-cancelled hover:bg-porter-bg-surface"
-                      onClick={async () => {
-                        if (!confirm("Cancel this order?")) return;
-                        const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", o.id);
-                        if (error) toast(error.message, "error");
-                        else {
-                          setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: "cancelled" } : x)));
-                          toast("Order cancelled", "success");
-                        }
+                      onClick={() => {
+                        setCancelTarget(o);
                       }}
                     >
                       Cancel order
@@ -277,6 +273,26 @@ export default function OrderHistoryClient({
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={cancelTarget != null}
+        onClose={() => setCancelTarget(null)}
+        title="Cancel this order?"
+        description="The customer will still see this in their history as cancelled."
+        confirmLabel="Cancel order"
+        variant="danger"
+        onConfirm={async () => {
+          if (!cancelTarget) return;
+          const id = cancelTarget.id;
+          const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", id);
+          if (error) {
+            toast(error.message, "error");
+            throw new Error(error.message);
+          }
+          setOrders((prev) => prev.map((x) => (x.id === id ? { ...x, status: "cancelled" } : x)));
+          toast("Order cancelled", "success");
+        }}
+      />
 
       {panel && (
         <OrderDetailPanel

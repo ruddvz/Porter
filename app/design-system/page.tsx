@@ -4,6 +4,8 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
+  Drawer,
   EmptyState,
   Input,
   Modal,
@@ -20,11 +22,13 @@ import { useState } from "react";
 export default function DesignSystemPage() {
   const { push } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
 
   return (
     <div className="min-h-screen bg-porter-bg-base pb-24 pt-6 text-porter-text-primary">
-      <div className="mx-auto max-w-5xl space-y-10 px-4">
+      <main id="main-content" className="mx-auto max-w-5xl space-y-10 px-4">
         <header>
           <h1 className="text-display text-porter-green-500">PORTER</h1>
           <p className="mt-2 text-heading">Design system</p>
@@ -190,6 +194,32 @@ export default function DesignSystemPage() {
         </section>
 
         <section className="space-y-4">
+          <h2 className="text-title">Drawer + confirm</h2>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setDrawerOpen(true)}>
+              Open drawer
+            </Button>
+            <Button type="button" variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
+              Open confirm
+            </Button>
+          </div>
+          <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Example panel">
+            <p className="text-sm">Plan0-style right sheet on desktop; bottom sheet on mobile.</p>
+          </Drawer>
+          <ConfirmDialog
+            open={confirmOpen}
+            onClose={() => setConfirmOpen(false)}
+            title="Delete item?"
+            description="This is a demo — nothing is deleted."
+            confirmLabel="Delete"
+            onConfirm={async () => {
+              await new Promise((r) => setTimeout(r, 400));
+              push("Confirmed (demo)", "success");
+            }}
+          />
+        </section>
+
+        <section className="space-y-4">
           <h2 className="text-title">Sidebar (mobile drawer)</h2>
           <Button type="button" variant="secondary" className="lg:hidden" onClick={() => setMobileNav(true)}>
             Open drawer
@@ -211,7 +241,7 @@ export default function DesignSystemPage() {
             On large screens the fixed sidebar sits to the left; on small screens use the button to open the drawer.
           </p>
         </section>
-      </div>
+      </main>
     </div>
   );
 }

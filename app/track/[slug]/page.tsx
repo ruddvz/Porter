@@ -39,7 +39,7 @@ export default async function TrackOrderPage({ params }: { params: { slug: strin
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] px-4 py-10 text-zinc-100">
+    <main id="main-content" className="min-h-screen bg-[#0a0a0f] px-4 py-10 text-zinc-100">
       <div className="mx-auto max-w-md">
         <p className="text-center font-display text-2xl tracking-wide text-emerald-400">PORTER</p>
         <h1 className="mt-2 text-center text-xl font-semibold">{row.store_name}</h1>
@@ -90,6 +90,6 @@ export default async function TrackOrderPage({ params }: { params: { slug: strin
           This page shows order status only. For changes, message the store on WhatsApp.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

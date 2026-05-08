@@ -156,6 +156,25 @@ export interface Conversation {
   last_nudge_at?: string | null;
 }
 
+/** Row for seller conversations list (dashboard). */
+export type ConversationListRow = {
+  id: string;
+  customer_phone: string;
+  state: string;
+  last_message_at: string | null;
+  customer_name: string | null;
+};
+
+/** Persisted WhatsApp thread line (Plan0 §7) — see migration `013_conversation_messages.sql`. */
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  seller_id: string;
+  direction: "in" | "out";
+  body: string;
+  created_at: string;
+}
+
 /** JSON stored in conversations.context during the bot flow. */
 export interface ConversationContext {
   items?: ParsedLineItem[];

@@ -13,14 +13,16 @@ export default function MarketingClient() {
   return (
     <div className="min-h-screen bg-porter-bg-base text-porter-text-primary">
       <MarketingNav />
-      <MarketingHero />
-      <MarketingPain />
-      <MarketingHow />
-      <MarketingDemoLarge />
-      <MarketingFeatures />
-      <MarketingPricing />
-      <MarketingFaq />
-      <MarketingFooter />
+      <main id="main-content">
+        <MarketingHero />
+        <MarketingPain />
+        <MarketingHow />
+        <MarketingDemoLarge />
+        <MarketingFeatures />
+        <MarketingPricing />
+        <MarketingFaq />
+        <MarketingFooter />
+      </main>
     </div>
   );
 }

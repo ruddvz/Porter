@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16 text-white/80">
+    <main id="main-content" className="mx-auto max-w-2xl px-4 py-16 text-white/80">
       <Link href="/" className="text-sm text-[#25D366]">
         ← Home
       </Link>

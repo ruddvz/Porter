@@ -8,7 +8,7 @@ import { registerSellerServiceWorker } from "@/lib/registerServiceWorker";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
 import { cn } from "@/lib/cn";
-import { LayoutDashboard, Package, ScrollText, Settings, BarChart3 } from "lucide-react";
+import { BarChart3, LayoutDashboard, MessageCircle, Package, ScrollText, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 function pageTitle(pathname: string): string {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard?")) return "Live Orders";
   if (pathname.startsWith("/dashboard/orders")) return "Order History";
+  if (pathname.startsWith("/dashboard/conversations")) return "Chats";
   if (pathname.startsWith("/dashboard/analytics")) return "Analytics";
   if (pathname.startsWith("/dashboard/inventory")) return "Inventory";
   if (pathname.startsWith("/dashboard/settings")) return "Settings";
@@ -43,6 +44,7 @@ export default function ShopDashboardShell({
     () => [
       { href: "/dashboard", label: "Live Orders", icon: LayoutDashboard, badge: pendingOrderCount > 0 ? pendingOrderCount : undefined },
       { href: "/dashboard/orders", label: "History", icon: ScrollText },
+      { href: "/dashboard/conversations", label: "Chats", icon: MessageCircle },
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/inventory", label: "Inventory", icon: Package },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -88,7 +90,7 @@ export default function ShopDashboardShell({
           onOpenNav={() => setMobileNav(true)}
           impersonating={impersonating}
         />
-        <main className="min-h-[calc(100vh-3.5rem)] space-y-4 pb-24">
+        <main id="main-content" className="min-h-[calc(100vh-3.5rem)] space-y-4 pb-24">
           <div className="px-3 pt-3 md:px-6 md:pt-4">
             <PushPrompt seller={seller} />
           </div>

@@ -1,5 +1,9 @@
 "use client";
 
+import { AuthShell } from "@/components/auth/AuthShell";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,45 +35,52 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-      <h1 className="font-['Bebas_Neue',sans-serif] text-5xl tracking-wide text-[#25D366]">PORTER</h1>
-      <p className="mt-2 text-sm text-white/70">Seller login</p>
-      <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-xl border border-white/10 bg-[#111A14] p-6">
-        <label className="block text-sm">
-          <span className="text-white/80">Email</span>
-          <input
+    <AuthShell subtitle="Seller login">
+      <Card padding="lg" className="mx-auto w-full max-w-md border-porter-bg-border shadow-modal">
+        <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+          <div>
+            <h1 className="text-heading text-porter-text-primary">Sign in</h1>
+            <p className="mt-1 text-sm text-porter-text-muted">Use the email and password for your Porter seller account.</p>
+          </div>
+          <Input.Text
+            id="login-email"
+            label="Email"
             type="email"
             required
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 outline-none ring-[#25D366] focus:ring-2"
           />
-        </label>
-        <label className="block text-sm">
-          <span className="text-white/80">Password</span>
-          <input
+          <Input.Text
+            id="login-password"
+            label="Password"
             type="password"
             required
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 outline-none ring-[#25D366] focus:ring-2"
           />
-        </label>
-        {error && <p className="text-sm text-[#FF6B35]">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-[#25D366] py-2.5 font-semibold text-black disabled:opacity-50"
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
-      <p className="mt-6 text-center text-sm text-white/60">
-        New here?{" "}
-        <Link href="/auth/signup" className="text-[#25D366] underline">
-          Create account
-        </Link>
-      </p>
-    </main>
+          {error ? (
+            <p className="text-sm font-medium text-porter-orange-500" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end">
+            <Link href="/auth/forgot-password" className="text-sm text-porter-green-400 underline-offset-2 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <Button type="submit" variant="primary" className="w-full" loading={loading}>
+            Sign in
+          </Button>
+        </form>
+        <p className="mt-6 text-center text-sm text-porter-text-muted">
+          New here?{" "}
+          <Link href="/auth/signup" className="font-medium text-porter-green-400 underline-offset-2 hover:underline">
+            Create account
+          </Link>
+        </p>
+      </Card>
+    </AuthShell>
   );
 }
