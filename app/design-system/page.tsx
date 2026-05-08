@@ -4,6 +4,8 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
+  Drawer,
   EmptyState,
   Input,
   Modal,
@@ -20,6 +22,8 @@ import { useState } from "react";
 export default function DesignSystemPage() {
   const { push } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
 
   return (
@@ -187,6 +191,32 @@ export default function DesignSystemPage() {
             <Skeleton variant="text" width="1/2" />
             <Skeleton variant="card" />
           </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-title">Drawer + confirm</h2>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setDrawerOpen(true)}>
+              Open drawer
+            </Button>
+            <Button type="button" variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
+              Open confirm
+            </Button>
+          </div>
+          <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Example panel">
+            <p className="text-sm">Plan0-style right sheet on desktop; bottom sheet on mobile.</p>
+          </Drawer>
+          <ConfirmDialog
+            open={confirmOpen}
+            onClose={() => setConfirmOpen(false)}
+            title="Delete item?"
+            description="This is a demo — nothing is deleted."
+            confirmLabel="Delete"
+            onConfirm={async () => {
+              await new Promise((r) => setTimeout(r, 400));
+              push("Confirmed (demo)", "success");
+            }}
+          />
         </section>
 
         <section className="space-y-4">

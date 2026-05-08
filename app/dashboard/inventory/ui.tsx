@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { Pencil, Trash2 } from "lucide-react";
@@ -47,6 +48,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
   const [bulkCategoryPreset, setBulkCategoryPreset] = useState(() => PRESET_CATEGORIES[0] ?? "Other");
   const [bulkCategoryCustom, setBulkCategoryCustom] = useState("");
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   type SortKey = "name" | "price_asc" | "price_desc" | "stock_low" | "category";
   const [sortBy, setSortBy] = useState<SortKey>("name");
 
@@ -242,16 +244,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
                 type="button"
                 className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-porter-text-muted hover:bg-porter-bg-raised hover:text-porter-status-cancelled"
                 aria-label="Delete"
-                onClick={async () => {
-                  if (!confirm("Delete this product?")) return;
-                  const prev = products;
-                  setProducts((x) => x.filter((y) => y.id !== p.id));
-                  const { error } = await supabase.from("products").delete().eq("id", p.id);
-                  if (error) {
-                    setProducts(prev);
-                    toast(error.message, "error");
-                  } else toast("Product deleted", "success");
-                }}
+                onClick={() => setDeleteProduct(p)}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -417,6 +410,28 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
         />
         <p className="mt-2 text-xs text-porter-text-muted">Applies to every selected product. Unit (kg, piece, etc.) is unchanged.</p>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteProduct != null}
+        onClose={() => setDeleteProduct(null)}
+        title="Delete this product?"
+        description="This permanently removes it from your catalog and the WhatsApp bot."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={async () => {
+          if (!deleteProduct) return;
+          const p = deleteProduct;
+          const prev = products;
+          setProducts((x) => x.filter((y) => y.id !== p.id));
+          const { error } = await supabase.from("products").delete().eq("id", p.id);
+          if (error) {
+            setProducts(prev);
+            toast(error.message, "error");
+            throw new Error(error.message);
+          }
+          toast("Product deleted", "success");
+        }}
+      />
 
       <Modal
         open={bulkDeleteOpen}

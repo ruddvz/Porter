@@ -93,7 +93,7 @@
     text-transform: uppercase;
   }
   .text-mono {
-    font-family: var(--font-dm-mono), var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
+    font-family: var(--font-dm-mono), var(--font-geist-mono), var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
     font-size: 13px;
     line-height: 1.45;
     font-weight: 400;

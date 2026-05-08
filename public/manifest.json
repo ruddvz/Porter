@@ -31,10 +31,15 @@
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
+      "name": "Chats",
+      "short_name": "Chats",
+      "url": "/dashboard/conversations",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
       "name": "Analytics",
       "short_name": "Stats",
       "url": "/dashboard/analytics",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
-  ]
 }

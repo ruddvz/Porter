@@ -1,16 +1,10 @@
 import { waitUntil } from "@vercel/functions";
+import { appendConversationMessage, normalizeCustomerPhone } from "@/lib/conversation-messages";
 import { getSellerByMetaPhoneNumberId, handleIncomingCustomerMessage } from "@/lib/conversation";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import type { MetaWebhookPayload } from "@/types";
 
 export const runtime = "nodejs";
-
-function normalizeWaPhone(from: string): string {
-  const digits = from.replace(/\D/g, "");
-  if (digits.length === 10) return `+91${digits}`;
-  if (from.startsWith("+")) return `+${digits}`;
-  return `+${digits}`;
-}
 
 /** Meta WhatsApp Cloud API webhook: GET verifies subscription, POST receives messages. */
 export async function GET(req: Request) {
@@ -52,7 +46,7 @@ export async function POST(req: Request) {
         console.error("[whatsapp-webhook] No seller for phone_number_id", phoneNumberId);
         return;
       }
-      const phone = normalizeWaPhone(from);
+      const phone = normalizeCustomerPhone(from);
       const supabase = createSupabaseServiceRoleClient();
       const { count: orderCount } = await supabase
         .from("orders")
@@ -67,6 +61,21 @@ export async function POST(req: Request) {
         .maybeSingle();
       const isFirstMessage = (orderCount ?? 0) === 0 && !existingConv;
       await handleIncomingCustomerMessage(seller, from, body, { isFirstMessage });
+      const { data: convAfter } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("seller_id", seller.id)
+        .eq("customer_phone", phone)
+        .maybeSingle();
+      if (convAfter?.id) {
+        const logged = await appendConversationMessage(supabase, {
+          sellerId: seller.id,
+          conversationId: convAfter.id,
+          direction: "in",
+          body,
+        });
+        if (!logged.ok) console.error("[whatsapp-webhook] conversation_messages insert", logged.error);
+      }
     })()
   );
 

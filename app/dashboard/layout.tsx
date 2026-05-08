@@ -1,4 +1,4 @@
-import { Bebas_Neue, DM_Mono, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Bebas_Neue, DM_Sans, JetBrains_Mono } from "next/font/google";
 import ShopDashboardShell from "@/components/dashboard/ShopDashboardShell";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -8,7 +8,6 @@ import { redirect } from "next/navigation";
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
 const bebas = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
-const dmMono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-dm-mono" });
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createSupabaseServerClient();
@@ -61,7 +60,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .limit(5);
 
   return (
-    <div className={`${dmSans.variable} ${bebas.variable} ${jetbrains.variable} ${dmMono.variable} min-h-screen bg-porter-bg-base font-sans text-porter-text-primary`}>
+    <div className={`${dmSans.variable} ${bebas.variable} ${jetbrains.variable} min-h-screen bg-porter-bg-base font-sans text-porter-text-primary`}>
       <ShopDashboardShell
         seller={seller}
         pendingOrderCount={pendingCount ?? 0}

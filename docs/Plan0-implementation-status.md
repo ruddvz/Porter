@@ -2,6 +2,8 @@
 
 **Companion:** [docs/Plan0.md](Plan0.md) (full spec). **This file** is the single checklist of **what exists in the repo** vs that spec.
 
+**“Pixel perfect” reality:** Plan0 is a long product brief (auth split layout, every chart RPC, full icon ladder, WCAG audit, Lighthouse 90+, etc.). This repo now covers **the same capabilities** for most seller flows, but **not every literal CSS value, asset size, and QA line item** from Plan0 is cloned 1:1. Treat Plan0 as the **north star**; this matrix as **what shipped**.
+
 This file answers: **“What was done for Plan 0?”** Git history only shows two commits because **those commits only added the spec** (`docs/Plan0.md`). Almost everything else in the repo was built earlier under **roadmap / improvement-plan PRs** (#6–#12, etc.) with different commit messages — same product goals as Plan0, but **not labeled “Plan0” in git**.
 
 Use this matrix as the single place to see **Plan0 § vs codebase**. Update it when you ship slices.
@@ -23,12 +25,12 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
 | Industrial dark + `#25D366` accent | **Partial** | Porter uses green accent + `porter-bg-*` palette; not the exact Plan0 neutral ramp (`#0a0a0a` / `#111` …) |
-| Geist + DM Mono + Noto Arabic | **Partial** | **DM Mono** via `next/font` on **dashboard** layout; `.text-mono` prefers `--font-dm-mono`. Geist / Noto Arabic not wired |
+| Geist + DM Mono + Noto Arabic | **Partial** | **Geist Sans + Geist Mono** on root `<html>` (`geist` package); **DM Mono** for `--font-dm-mono`; Tailwind `sans` prefers DM Sans where loaded (dashboard/marketing). **Noto Arabic** not wired |
 | CSS variables `--bg-base`, `--accent`, … | **Partial** | Porter `porter-*` Tailwind is canonical; **`--plan0-*` bridge + safe-area** in `globals.css` for gradual alignment |
-| `manifest.json` | **Partial** | Icons 192/512, theme/background, categories, **shortcuts** (live orders, history, inventory, analytics); no full icon ladder, screenshots, or `display_override` |
+| `manifest.json` | **Partial** | Icons 192/512, theme/background, categories, **shortcuts** (orders, history, inventory, **chats**, analytics); no full icon ladder, screenshots, or `display_override` |
 | `sw.js` | **Partial** | Real SW: cache shell, push, notification click; not full Plan0 fetch strategies (network-first pages, etc.) |
 | `/offline` | **Done** | `app/offline/page.tsx` + SW precache / HTML navigate fallback |
-| Root `layout.tsx` fonts + manifest meta + SW | **Partial** | Title template, `viewport.themeColor`, Apple meta, **skip-to-content**, **unhandled-rejection → toast**; seller SW on **dashboard shell** only (admin has separate SW scope) |
+| Root `layout.tsx` fonts + manifest meta + SW | **Partial** | **Geist** + **DM Mono** on root `html`; title template, `viewport`, Apple meta, skip link, unhandled-rejection toast; seller SW on **dashboard shell** only |
 
 ---
 
@@ -73,8 +75,9 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
-| Seller `/dashboard/conversations` | **Gap** | No dedicated page; conversations exist in DB + admin |
-| `/api/wa/send` | **Gap** | Not present; Plan0 describes new route |
+| Seller `/dashboard/conversations` | **Done** | Split list + thread, masked phone, quick replies, **Supabase Realtime** on `conversation_messages` |
+| `/api/wa/send` | **Done** | `app/api/wa/send/route.ts` — session-scoped seller, `sendMessage` + DB log |
+| Message persistence | **Done** | `013_conversation_messages.sql`; webhook logs **inbound** after bot handling |
 
 ---
 
@@ -124,7 +127,7 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
 | Button, Input, Modal, Toast, Skeleton, EmptyState | **Done** | Under `components/ui/` |
-| Drawer, ConfirmDialog | **Gap** | Plan0 lists them; repo uses **Modal** patterns instead |
+| Drawer, ConfirmDialog | **Done** | `components/ui/Drawer.tsx`, `ConfirmDialog.tsx`; demos on `/design-system`; **ConfirmDialog** replaces `window.confirm` in inventory + order history |
 | `PWAInstallBanner` | **Partial** | **`InstallPrompt`** in dashboard fulfills same role |
 
 ---

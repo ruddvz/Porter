@@ -48,9 +48,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-dm-sans)", "DM Sans", "sans-serif"],
+        sans: ["var(--font-dm-sans)", "var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-bebas)", "Bebas Neue", "sans-serif"],
-        mono: ["var(--font-jetbrains)", "JetBrains Mono", "monospace"],
+        mono: ["var(--font-dm-mono)", "var(--font-geist-mono)", "ui-monospace", "monospace"],
       },
       spacing: {
         1: "4px",
