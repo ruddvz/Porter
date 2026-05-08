@@ -6,7 +6,7 @@ name: Deploy docs to GitHub Pages
 on:
   push:
     branches: ["main"]
-    paths: ["docs/**", ".github/workflows/pages.yml"]
+    paths: ["docs/**", ".github/workflows/pages.yml", ".github/scripts/**"]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Optional: set repository variable PORTER_LIVE_URL (e.g. https://porter-xxx.vercel.app)
+      # so the GitHub Pages landing shows an "Open live app" button next to Deploy.
+      - name: Inject live app link into docs
+        env:
+          PORTER_LIVE_URL: ${{ vars.PORTER_LIVE_URL }}
+        run: python3 .github/scripts/inject-docs-live-url.py
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
