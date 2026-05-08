@@ -24,6 +24,16 @@
   --plan0-radius-sm: 4px;
   --plan0-radius-md: 8px;
   --plan0-radius-lg: 12px;
+
+  /* Plan0 §1 — semantic aliases (bridge to Tailwind porter-* over time) */
+  --bg-base: var(--plan0-bg-base);
+  --bg-surface: var(--plan0-bg-surface);
+  --bg-elevated: var(--plan0-bg-elevated);
+  --border-plan0: var(--plan0-border);
+  --text-primary: var(--plan0-text-primary);
+  --text-secondary: var(--plan0-text-secondary);
+  --accent: var(--plan0-accent);
+
   --sat: env(safe-area-inset-top, 0px);
   --sar: env(safe-area-inset-right, 0px);
   --sab: env(safe-area-inset-bottom, 0px);

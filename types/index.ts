@@ -90,6 +90,8 @@ export interface Product {
   image_url?: string | null;
   is_active?: boolean;
   stock_quantity?: number;
+  /** Lower values appear first when using custom sort / drag reorder (Plan0 §5). */
+  sort_order?: number;
   created_at: string;
 }
 

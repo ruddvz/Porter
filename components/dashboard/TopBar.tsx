@@ -72,7 +72,7 @@ export default function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-porter-bg-border bg-porter-bg-base/90 px-3 backdrop-blur lg:px-4">
+    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-3 border-b border-porter-bg-border bg-porter-bg-base/90 px-3 pt-[env(safe-area-inset-top)] backdrop-blur lg:px-4">
       <button
         type="button"
         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-porter-bg-border text-porter-text-primary lg:hidden"

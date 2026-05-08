@@ -31,8 +31,8 @@ export default function SellerDetailActions({
     });
     setBusy(false);
     if (!res.ok) {
-      const j = (await res.json().catch(() => ({}))) as { error?: string };
-      toast(j.error ?? "Failed to update plan", "error");
+      const j = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+      toast(j.error?.message ?? "Failed to update plan", "error");
       return;
     }
     toast("Plan updated", "success");
@@ -44,8 +44,8 @@ export default function SellerDetailActions({
     const res = await fetch(`/api/admin/sellers/${sellerId}/deactivate`, { method: "POST" });
     setBusy(false);
     if (!res.ok) {
-      const j = (await res.json().catch(() => ({}))) as { error?: string };
-      toast(j.error ?? "Failed to deactivate", "error");
+      const j = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+      toast(j.error?.message ?? "Failed to deactivate", "error");
       return;
     }
     toast("Seller deactivated", "success");

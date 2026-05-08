@@ -1,5 +1,5 @@
+import { apiErr, apiOk } from "@/lib/api-json";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -10,23 +10,23 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return apiErr("Unauthorized", 401, "401");
 
   let body: { sellerId?: string };
   try {
     body = (await req.json()) as { sellerId?: string };
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return apiErr("Invalid JSON", 400);
   }
   const sellerId = body.sellerId?.trim();
-  if (!sellerId) return NextResponse.json({ error: "sellerId required" }, { status: 400 });
+  if (!sellerId) return apiErr("sellerId required", 400);
 
   const admin = createSupabaseAdminClient();
   const { data: adminRow } = await admin.from("admin_users").select("id").eq("user_id", user.id).maybeSingle();
-  if (!adminRow) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!adminRow) return apiErr("Forbidden", 403, "403");
 
   const { data: seller } = await admin.from("sellers").select("id").eq("id", sellerId).maybeSingle();
-  if (!seller) return NextResponse.json({ error: "Seller not found" }, { status: 404 });
+  if (!seller) return apiErr("Seller not found", 404, "404");
 
   const cookieStore = await cookies();
   cookieStore.set("porter_admin_impersonate", sellerId, {
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     notes: null,
   });
 
-  return NextResponse.json({ ok: true });
+  return apiOk({ ok: true });
 }
 
 export async function DELETE() {
@@ -53,11 +53,11 @@ export async function DELETE() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return apiErr("Unauthorized", 401, "401");
 
   const admin = createSupabaseAdminClient();
   const { data: adminRow } = await admin.from("admin_users").select("id").eq("user_id", user.id).maybeSingle();
-  if (!adminRow) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!adminRow) return apiErr("Forbidden", 403, "403");
 
   const cookieStore = await cookies();
   cookieStore.delete("porter_admin_impersonate");
@@ -70,5 +70,5 @@ export async function DELETE() {
     notes: null,
   });
 
-  return NextResponse.json({ ok: true });
+  return apiOk({ ok: true });
 }

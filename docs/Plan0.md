@@ -5,7 +5,7 @@
 >
 > Your task is a **full UI/UX overhaul**: pixel-perfect styling, real working interactions (no fake/placeholder code), and a polished installable PWA that works identically on mobile and desktop.
 >
-> **Repo status:** [Plan0-implementation-status.md](Plan0-implementation-status.md) lists what is already built in this codebase vs this spec (git history alone is misleading).
+> **Repo status:** [Plan0-implementation-status.md](Plan0-implementation-status.md) lists what is already built in this codebase vs this spec (git history alone is misleading). **[Plan0-manual-tasks.md](Plan0-manual-tasks.md)** lists operator-only steps (screenshots, Supabase dashboard, assets).
 
 ---
 
