@@ -82,7 +82,7 @@ export function Modal({
       <button
         type="button"
         aria-label="Close dialog"
-        className="absolute inset-0 bg-black/50 transition-opacity duration-base"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-base"
         onClick={onClose}
       />
       <div

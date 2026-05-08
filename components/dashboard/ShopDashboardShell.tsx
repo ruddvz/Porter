@@ -5,19 +5,36 @@ import TopBar, { type TopBarRecentOrder } from "@/components/dashboard/TopBar";
 import InstallPrompt from "@/components/dashboard/InstallPrompt";
 import PushPrompt from "@/components/dashboard/PushPrompt";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
+import { useRealtimePendingCount } from "@/lib/hooks/useRealtimePendingCount";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
 import { cn } from "@/lib/cn";
-import { LayoutDashboard, Package, ScrollText, Settings, BarChart3 } from "lucide-react";
+import {
+  BarChart3,
+  LayoutDashboard,
+  MessageCircle,
+  Package,
+  Settings,
+  ShoppingCart,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+function navActive(href: string, pathname: string) {
+  if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/dashboard/";
+  if (href === "/dashboard/products") {
+    return pathname.startsWith("/dashboard/products") || pathname.startsWith("/dashboard/inventory");
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function pageTitle(pathname: string): string {
-  if (pathname === "/dashboard" || pathname.startsWith("/dashboard?")) return "Live Orders";
-  if (pathname.startsWith("/dashboard/orders")) return "Order History";
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard?")) return "Dashboard";
+  if (pathname.startsWith("/dashboard/orders")) return "Orders";
+  if (pathname.startsWith("/dashboard/conversations")) return "Conversations";
   if (pathname.startsWith("/dashboard/analytics")) return "Analytics";
-  if (pathname.startsWith("/dashboard/inventory")) return "Inventory";
+  if (pathname.startsWith("/dashboard/inventory") || pathname.startsWith("/dashboard/products")) return "Products";
   if (pathname.startsWith("/dashboard/settings")) return "Settings";
   return "Dashboard";
 }
@@ -39,15 +56,39 @@ export default function ShopDashboardShell({
   const router = useRouter();
   const [mobileNav, setMobileNav] = useState(false);
 
-  const items: SidebarNavItem[] = useMemo(
+  const pendingLive = useRealtimePendingCount(seller.id, pendingOrderCount);
+
+  const sidebarItems: SidebarNavItem[] = useMemo(
     () => [
-      { href: "/dashboard", label: "Live Orders", icon: LayoutDashboard, badge: pendingOrderCount > 0 ? pendingOrderCount : undefined },
-      { href: "/dashboard/orders", label: "History", icon: ScrollText },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/dashboard/products", label: "Products", icon: Package },
+      {
+        href: "/dashboard/orders",
+        label: "Orders",
+        icon: ShoppingCart,
+        badge: pendingLive > 0 ? pendingLive : undefined,
+      },
+      { href: "/dashboard/conversations", label: "Conversations", icon: MessageCircle },
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-      { href: "/dashboard/inventory", label: "Inventory", icon: Package },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
-    [pendingOrderCount],
+    [pendingLive],
+  );
+
+  const bottomItems = useMemo(
+    () => [
+      { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+      {
+        href: "/dashboard/orders",
+        label: "Orders",
+        icon: ShoppingCart,
+        badge: pendingLive > 0 ? pendingLive : undefined,
+      },
+      { href: "/dashboard/products", label: "Products", icon: Package },
+      { href: "/dashboard/conversations", label: "Chats", icon: MessageCircle },
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+    [pendingLive],
   );
 
   async function logout() {
@@ -65,12 +106,12 @@ export default function ShopDashboardShell({
         brand="PORTER"
         subtitle={seller.store_name}
         userName={seller.store_name}
-        items={items}
+        items={sidebarItems}
         onLogout={logout}
         mobileOpen={mobileNav}
         onMobileOpenChange={setMobileNav}
       />
-      <div className="min-h-screen lg:pl-60">
+      <div className="min-h-screen lg:pl-[220px]">
         {impersonating && (
           <div className="sticky top-0 z-40 border-b border-porter-status-cancelled/40 bg-porter-status-cancelled/15 px-4 py-2 text-center text-sm font-semibold text-porter-status-cancelled">
             You are viewing as {seller.store_name}. Use Exit view in the top bar to return to admin.
@@ -79,7 +120,7 @@ export default function ShopDashboardShell({
         <TopBar
           title={title}
           seller={seller}
-          pendingOrderCount={pendingOrderCount}
+          pendingOrderCount={pendingLive}
           recentPendingOrders={recentPendingOrders}
           onOpenNav={() => setMobileNav(true)}
           impersonating={impersonating}
@@ -98,19 +139,16 @@ export default function ShopDashboardShell({
           aria-label="Primary"
         >
           <div className="mx-auto flex max-w-lg justify-around px-1 py-2">
-            {items.map((item) => {
-              const active =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard" || pathname === "/dashboard/"
-                  : pathname.startsWith(item.href);
+            {bottomItems.map((item) => {
+              const active = navActive(item.href, pathname);
               const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex min-h-12 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] font-semibold uppercase tracking-wide transition-colors",
-                    active ? "text-porter-green-400" : "text-porter-text-muted hover:text-porter-text-secondary",
+                    "flex min-h-12 min-w-[3.5rem] flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-mono uppercase tracking-wide transition-colors",
+                    active ? "text-[--accent]" : "text-porter-text-muted hover:text-porter-text-secondary",
                   )}
                 >
                   <span className="relative inline-flex">
@@ -121,7 +159,7 @@ export default function ShopDashboardShell({
                       </span>
                     )}
                   </span>
-                  <span className="max-w-[4.5rem] truncate">{item.label}</span>
+                  <span className="max-w-[4rem] truncate">{item.label}</span>
                 </Link>
               );
             })}

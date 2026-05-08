@@ -11,6 +11,8 @@ export { Table } from "./Table";
 export type { SortDir, TableColumn, TableProps } from "./Table";
 export { Modal } from "./Modal";
 export type { ModalProps } from "./Modal";
+export { ConfirmDialog } from "./ConfirmDialog";
+export type { ConfirmDialogProps } from "./ConfirmDialog";
 export { Sidebar } from "./Sidebar";
 export type { SidebarNavItem, SidebarProps } from "./Sidebar";
 export { ToastProvider, useToast } from "./Toast";

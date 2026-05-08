@@ -56,7 +56,7 @@ export function Sidebar({
     onMobileOpenChange?.(false);
   }, [pathname, onMobileOpenChange]);
 
-  const width = collapsed ? "w-16" : "w-60";
+  const width = collapsed ? "w-16" : "w-[220px]";
 
   const nav = (
     <>
@@ -94,12 +94,12 @@ export function Sidebar({
               className={cn(
                 "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-fast",
                 active
-                  ? "border-l-2 border-porter-green-500 bg-porter-green-500/10 text-porter-text-primary"
+                  ? "border-l-2 border-[--accent] bg-porter-bg-raised text-[--accent]"
                   : "border-l-2 border-transparent text-porter-text-secondary hover:bg-porter-bg-raised hover:text-porter-text-primary",
                 collapsed && "justify-center px-2",
               )}
             >
-              <Icon className="h-5 w-5 shrink-0 text-porter-green-400" />
+              <Icon className="h-5 w-5 shrink-0 text-[--accent]" />
               {!collapsed && <span className="flex-1 truncate">{it.label}</span>}
               {!collapsed && it.badge !== undefined && (
                 <span className="flex items-center">

@@ -160,16 +160,20 @@
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-[--radius-sm] text-xs font-mono;
   }
   .badge-green {
-    @apply badge bg-[--accent]/10 text-[--accent];
+    @apply badge text-[--accent];
+    background-color: rgba(37, 211, 102, 0.12);
   }
   .badge-yellow {
-    @apply badge bg-[--warning]/10 text-[--warning];
+    @apply badge text-[--warning];
+    background-color: rgba(245, 158, 11, 0.12);
   }
   .badge-red {
-    @apply badge bg-[--danger]/10 text-[--danger];
+    @apply badge text-[--danger];
+    background-color: rgba(239, 68, 68, 0.12);
   }
   .badge-blue {
-    @apply badge bg-[--info]/10 text-[--info];
+    @apply badge text-[--info];
+    background-color: rgba(59, 130, 246, 0.12);
   }
   .badge-muted {
     @apply badge bg-[--bg-overlay] text-[--text-muted];

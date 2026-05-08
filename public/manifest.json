@@ -55,7 +55,7 @@
     },
     {
       "name": "Products",
-      "url": "/dashboard/inventory",
+      "url": "/dashboard/products",
       "icons": [{ "src": "/icons/shortcut-products.png", "sizes": "96x96", "type": "image/png" }]
     },
     {

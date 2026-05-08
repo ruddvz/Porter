@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
+import confetti from "canvas-confetti";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -87,11 +88,18 @@ export default function OnboardingForm() {
       return;
     }
     if (inserted?.id) {
+      confetti({
+        particleCount: 140,
+        spread: 75,
+        origin: { y: 0.65 },
+        colors: ["#25D366", "#ffffff", "#128C7E"],
+      });
       void fetch("/api/internal/after-seller-created", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seller_id: inserted.id }),
       });
+      await new Promise((r) => setTimeout(r, 450));
     }
     router.push("/dashboard");
     router.refresh();
@@ -112,12 +120,12 @@ export default function OnboardingForm() {
 
   return (
     <div className="mt-8 space-y-6">
-      <div className="flex gap-2 text-sm text-white/60">
-        <span className={step === 1 ? "font-semibold text-[#25D366]" : ""}>1 Store</span>
+      <div className="flex gap-2 text-sm text-[--text-muted]">
+        <span className={step === 1 ? "font-mono font-semibold text-[--accent]" : ""}>1 Store</span>
         <span aria-hidden>→</span>
-        <span className={step === 2 ? "font-semibold text-[#25D366]" : ""}>2 WhatsApp API</span>
+        <span className={step === 2 ? "font-mono font-semibold text-[--accent]" : ""}>2 WhatsApp API</span>
         <span aria-hidden>→</span>
-        <span className={step === 3 ? "font-semibold text-[#25D366]" : ""}>3 Zones</span>
+        <span className={step === 3 ? "font-mono font-semibold text-[--accent]" : ""}>3 Launch</span>
       </div>
 
       {step === 1 && (

@@ -1,10 +1,9 @@
-import OrdersWorkspace from "./workspace";
+import ConversationsClient from "./ui";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import type { Conversation } from "@/types";
 import { redirect } from "next/navigation";
 
-const BOARD_LIMIT = 200;
-
-export default async function OrdersSectionPage() {
+export default async function ConversationsPage() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -13,18 +12,12 @@ export default async function OrdersSectionPage() {
   const { data: seller } = await supabase.from("sellers").select("*").eq("user_id", user.id).maybeSingle();
   if (!seller) redirect("/onboarding");
 
-  const { data: orders } = await supabase
-    .from("orders")
-    .select("*, order_items(*)")
+  const { data: rows } = await supabase
+    .from("conversations")
+    .select("*")
     .eq("seller_id", seller.id)
-    .order("created_at", { ascending: false })
-    .limit(BOARD_LIMIT);
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(200);
 
-  return (
-    <OrdersWorkspace
-      seller={seller}
-      initialOrders={orders ?? []}
-      pageSize={20}
-    />
-  );
+  return <ConversationsClient initialConversations={(rows ?? []) as Conversation[]} />;
 }

@@ -90,6 +90,8 @@ export interface Product {
   image_url?: string | null;
   is_active?: boolean;
   stock_quantity?: number;
+  sort_order?: number;
+  min_stock_alert?: number;
   created_at: string;
 }
 
