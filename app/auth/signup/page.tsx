@@ -1,6 +1,8 @@
 "use client";
 
 import { AuthShell } from "@/components/auth/AuthShell";
+import { GoogleOAuthButton } from "@/components/auth/GoogleOAuthButton";
+import { isGoogleAuthEnabled } from "@/lib/auth-config";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -17,6 +19,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const showGoogle = isGoogleAuthEnabled();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +70,19 @@ export default function SignupPage() {
           <Button type="submit" variant="primary" className="w-full" loading={loading}>
             Create account
           </Button>
+          {showGoogle ? (
+            <>
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center" aria-hidden>
+                  <span className="w-full border-t border-porter-bg-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase tracking-wide">
+                  <span className="bg-porter-bg-surface px-2 text-porter-text-muted">Or</span>
+                </div>
+              </div>
+              <GoogleOAuthButton nextPath="/onboarding" label="Sign up with Google" />
+            </>
+          ) : null}
         </form>
         <p className="mt-6 text-center text-sm text-porter-text-muted">
           Already have an account?{" "}

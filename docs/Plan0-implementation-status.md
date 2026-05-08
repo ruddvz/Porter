@@ -28,7 +28,7 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Geist + DM Mono (India / Latin) | **Partial** | **Geist Sans + Geist Mono** on root `<html>`; **DM Mono** for `--font-dm-mono`; Tailwind `sans` prefers DM Sans where loaded (dashboard/marketing). **Arabic / RTL stack intentionally out of scope** for India-first Porter |
 | CSS variables `--bg-base`, `--accent`, … | **Partial** | Porter `porter-*` Tailwind is canonical; **`--plan0-*` bridge + safe-area** in `globals.css` for gradual alignment |
 | `manifest.json` | **Partial** | Multiple **icon sizes** (72–512) + `purpose` any/maskable (reuses PNG assets); shortcuts incl. chats; **no screenshots** yet |
-| `sw.js` | **Partial** | Real SW: cache shell, push, notification click; not full Plan0 fetch strategies (network-first pages, etc.) |
+| `sw.js` | **Partial → stronger** | Same-origin GET routing: `/api/*` network-only; `/_next/static` + common static extensions cache-first; HTML navigations network-first with `/offline` fallback (does not cache HTML responses to avoid stale sessions on shared devices) |
 | `/offline` | **Done** | `app/offline/page.tsx` + SW precache / HTML navigate fallback |
 | Root `layout.tsx` fonts + manifest meta + SW | **Partial** | **Geist** + **DM Mono** on root `html`; title template, `viewport`, Apple meta, skip link, unhandled-rejection toast; seller SW on **dashboard shell** only |
 
@@ -39,7 +39,7 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
 | Split brand + form layout | **Partial → stronger** | **`AuthShell`** split panel on `lg+` for login, signup, forgot-password; Porter tokens + `Card` + `Input` |
-| Google OAuth + reset password | **Partial** | **Forgot password** at `/auth/forgot-password` (`resetPasswordForEmail`). Google OAuth still optional (needs callback route + env) |
+| Google OAuth + reset password | **Partial → stronger** | **Forgot password** at `/auth/forgot-password`. **`/auth/callback`** + **`signInWithOAuth`** on login/signup when **`NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`** (configure provider + redirect URLs in Supabase) |
 
 ---
 
@@ -162,7 +162,7 @@ No application code was committed under the name “Plan0” before offline/PWA 
 ## Suggested improvements (prioritized)
 
 1. **Keep this file updated** when merging Plan0-related PRs so chat history is not the source of truth.
-2. **Google OAuth** — add `/auth/callback` route + `signInWithOAuth` on login when `NEXT_PUBLIC_*` Google client is configured.
+2. **Google OAuth** — Implemented: `/auth/callback` + opt-in login/signup buttons when `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`; enable the Google provider and redirect URLs in Supabase.
 3. **Manifest screenshots** — add `screenshots` entries once you have stable marketing captures (Plan0 §1.1).
 4. **Dedicated maskable icons** — replace reused `icon-192.png` entries with properly padded maskable assets per size.
 5. **Single service worker story** — document why seller SW is dashboard-scoped vs admin; optional shared registration pattern if product allows.

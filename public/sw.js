@@ -1,5 +1,6 @@
-/* Porter seller dashboard — minimal offline shell */
-const CACHE = "porter-seller-v2";
+/* Porter seller dashboard — offline shell + Plan0-style fetch routing */
+const CACHE = "porter-seller-v3";
+const STATIC_EXT = /\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?)$/i;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -22,37 +23,52 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
+  const { request } = event;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // APIs — network only (Plan0)
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(fetch(request));
     return;
   }
-  if (url.pathname.startsWith("/_next/static/")) {
+
+  // Built chunks + static files — cache-first (Plan0-style assets)
+  if (url.pathname.startsWith("/_next/static/") || STATIC_EXT.test(url.pathname)) {
     event.respondWith(
-      caches.match(event.request).then((c) => c || fetch(event.request).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-        return res;
-      }))
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((res) => {
+          const copy = res.clone();
+          if (res.ok) {
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return res;
+        });
+      })
     );
     return;
   }
 
-  const accept = event.request.headers.get("accept") ?? "";
+  const accept = request.headers.get("accept") ?? "";
   const isHtmlNavigation =
-    event.request.mode === "navigate" || (event.request.method === "GET" && accept.includes("text/html"));
+    request.mode === "navigate" || (request.method === "GET" && accept.includes("text/html"));
 
-  event.respondWith(
-    fetch(event.request)
-      .then((res) => res)
-      .catch(() =>
-        caches.match(event.request).then((cached) => {
-          if (cached) return cached;
-          if (isHtmlNavigation) return caches.match("/offline");
-          return caches.match("/dashboard");
-        })
-      )
-  );
+  // HTML — network-first; avoid caching navigations (mixed sessions on shared devices)
+  if (isHtmlNavigation) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => res)
+        .catch(() =>
+          caches.match(request).then((cached) => cached || caches.match("/offline"))
+        )
+    );
+    return;
+  }
+
+  event.respondWith(fetch(request));
 });
 
 self.addEventListener("push", (event) => {

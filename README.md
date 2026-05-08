@@ -82,6 +82,8 @@ npm run dev
 
 **Push:** set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `PUSH_INTERNAL_SECRET` in Vercel for Web Push. **Encryption:** set `PORTER_CREDENTIAL_SECRET` (32+ char random) before using “encrypt at rest” on payment fields.
 
+**Google sign-in:** enable the Google provider in Supabase, add `/auth/callback` to redirect URLs, then set `NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true` so seller login and signup show “Continue with Google”.
+
 ## Tech stack
 
 | Area | Technologies |
