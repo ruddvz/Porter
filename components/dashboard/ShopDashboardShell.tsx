@@ -4,14 +4,14 @@ import { Sidebar, type SidebarNavItem } from "@/components/ui/Sidebar";
 import TopBar, { type TopBarRecentOrder } from "@/components/dashboard/TopBar";
 import InstallPrompt from "@/components/dashboard/InstallPrompt";
 import PushPrompt from "@/components/dashboard/PushPrompt";
-import { registerSellerServiceWorker } from "@/lib/registerServiceWorker";
+import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
 import { cn } from "@/lib/cn";
 import { LayoutDashboard, Package, ScrollText, Settings, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 function pageTitle(pathname: string): string {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard?")) return "Live Orders";
@@ -59,10 +59,6 @@ export default function ShopDashboardShell({
 
   const title = pageTitle(pathname);
 
-  useEffect(() => {
-    registerSellerServiceWorker();
-  }, []);
-
   return (
     <>
       <Sidebar
@@ -95,6 +91,7 @@ export default function ShopDashboardShell({
           {children}
         </main>
         <InstallPrompt />
+        <PWAInstallBanner />
 
         <nav
           className="fixed bottom-0 left-0 right-0 z-30 border-t border-porter-bg-border bg-porter-bg-base/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"

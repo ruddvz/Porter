@@ -1,56 +1,87 @@
-/* Porter seller dashboard — minimal offline shell */
-const CACHE = "porter-seller-v1";
+const CACHE_NAME = "porter-v1";
+const STATIC_ASSETS = ["/", "/dashboard", "/offline"];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(["/dashboard", "/manifest.json"]).catch(() => undefined))
+self.addEventListener("install", (e) => {
+  e.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((c) => c.addAll(STATIC_ASSETS).catch(() => undefined)),
   );
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
+    ),
+  );
+  self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/api/")) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(
-      caches.match(event.request).then((c) => c || fetch(event.request).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-        return res;
-      }))
+self.addEventListener("fetch", (e) => {
+  const { request } = e;
+  const url = new URL(request.url);
+
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
+  if (url.pathname.startsWith("/api/")) return;
+
+  if (url.pathname.match(/\.(js|css|png|jpg|svg|woff2?)$/)) {
+    e.respondWith(
+      caches.match(request).then((r) =>
+        r ||
+          fetch(request).then((res) => {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+            return res;
+          }),
+      ),
     );
     return;
   }
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((c) => c || caches.match("/dashboard")))
+
+  e.respondWith(
+    fetch(request)
+      .then((res) => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+        return res;
+      })
+      .catch(() =>
+        caches.match(request).then((r) => r || caches.match("/offline")),
+      ),
   );
 });
 
-self.addEventListener("push", (event) => {
-  let data = { title: "Porter", body: "", url: "/dashboard/orders" };
-  try {
-    if (event.data) data = { ...data, ...event.data.json() };
-  } catch {
-    /* ignore */
-  }
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
+self.addEventListener("push", (e) => {
+  const data = e.data?.json() ?? {};
+  e.waitUntil(
+    self.registration.showNotification(data.title ?? "Porter", {
+      body: data.body ?? "You have a new notification",
       icon: "/icons/icon-192.png",
-      data: { url: data.url || "/dashboard/orders" },
-    })
+      badge: "/icons/badge-72.png",
+      data: { url: data.url ?? "/dashboard/orders" },
+      actions: [
+        { action: "view", title: "View Order" },
+        { action: "dismiss", title: "Dismiss" },
+      ],
+      vibrate: [100, 50, 100],
+      tag: data.tag ?? "porter-notification",
+      renotify: true,
+    }),
   );
 });
 
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = event.notification.data?.url || "/dashboard/orders";
-  event.waitUntil(self.clients.openWindow(url));
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  if (e.action === "dismiss") return;
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => {
+      const target = e.notification.data?.url ?? "/dashboard";
+      const existing = cs.find((c) => c.url.includes(target));
+      if (existing) return existing.focus();
+      return clients.openWindow(target);
+    }),
+  );
 });

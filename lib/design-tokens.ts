@@ -1,6 +1,5 @@
 /**
- * Porter design tokens — mirrors Tailwind `porter.*` theme and CSS variables.
- * Use in JS when you need programmatic access (charts, canvas, etc.).
+ * Porter design tokens — mirrors CSS variables in `app/globals.css` and Tailwind `porter.*`.
  */
 
 export const porterColors = {
@@ -10,7 +9,7 @@ export const porterColors = {
     400: "#4ade80",
     500: "#25D366",
     600: "#16a34a",
-    700: "#128C47",
+    700: "#128C7E",
     900: "#14532d",
   },
   orange: {
@@ -19,21 +18,21 @@ export const porterColors = {
     600: "#ea580c",
   },
   bg: {
-    base: "#0A0F0D",
-    surface: "#111A14",
-    raised: "#162019",
-    border: "#1E2D22",
+    base: "#0a0a0a",
+    surface: "#111111",
+    raised: "#1a1a1a",
+    border: "#2a2a2a",
   },
   text: {
-    primary: "#E8F5E9",
-    secondary: "#A3B8A8",
-    muted: "#5C7A63",
+    primary: "#f5f5f5",
+    secondary: "#a0a0a0",
+    muted: "#5a5a5a",
   },
   status: {
     paid: "#25D366",
     unpaid: "#FF6B35",
     cod: "#F59E0B",
-    dispatched: "#60A5FA",
+    dispatched: "#3b82f6",
     delivered: "#A3E635",
     cancelled: "#F87171",
   },
@@ -52,10 +51,10 @@ export const spacing = {
 } as const;
 
 export const shadows = {
-  card: "0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(37,211,102,0.08)",
-  raised: "0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(37,211,102,0.12)",
-  modal: "0 24px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(37,211,102,0.15)",
-  glow: "0 0 24px rgba(37,211,102,0.2)",
+  card: "var(--shadow-card)",
+  raised: "var(--shadow-raised)",
+  modal: "var(--shadow-modal)",
+  glow: "var(--shadow-glow)",
 } as const;
 
 export const motion = {
@@ -66,7 +65,8 @@ export const motion = {
 } as const;
 
 export const fonts = {
-  display: "'Bebas Neue', sans-serif",
-  body: "'DM Sans', sans-serif",
-  mono: "'JetBrains Mono', monospace",
+  display: "var(--font-display), DM Mono, monospace",
+  body: "var(--font-body), Geist, sans-serif",
+  mono: "var(--font-display), DM Mono, monospace",
+  arabic: "var(--font-arabic), Noto Naskh Arabic, serif",
 } as const;
