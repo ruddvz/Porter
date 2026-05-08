@@ -2,6 +2,19 @@
 
 **WhatsApp-first dark-store SaaS** — turn natural-language chats into confirmed orders, payment links, and a dashboard your team can run day to day.
 
+## Live app (this is not GitHub Pages)
+
+If you open **`*.github.io`** for this project, you only see the **static** site from the `docs/` folder. **Dashboards, `/admin`, APIs, and webhooks are all in the Next.js app**, which GitHub Pages cannot run.
+
+**Fastest way to see the real UI:**
+
+1. Click **Deploy on Vercel** on the Pages site, or open [Import this repo on Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fruddvz%2FPorter&project-name=porter), sign in, and finish the import.
+2. When the build finishes, copy your production URL (for example `https://porter-xxx.vercel.app`).
+3. In the Vercel project, open **Settings → Environment Variables** and add every key from [`.env.example`](.env.example). Set **`NEXT_PUBLIC_APP_URL`** to that same production URL (no trailing slash), then **redeploy** so auth and tracking links resolve correctly.
+4. Apply Supabase migrations (see [Database (Supabase)](#database-supabase) below) and seed or sign up as needed.
+
+Optional: add a GitHub repository variable **`PORTER_LIVE_URL`** with your production URL (**Settings → Secrets and variables → Actions → Variables**). The next GitHub Pages deploy will show an **Open live app** button on the static landing page.
+
 ## Visuals
 
 > Add a screenshot or GIF of the marketing site, seller dashboard, or a sample WhatsApp flow.

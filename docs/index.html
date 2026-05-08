@@ -12,10 +12,39 @@
         <p class="eyebrow">WhatsApp-first ordering for Indian retailers</p>
         <h1>Porter</h1>
         <p class="lead">
-          This static site is published from the <code>docs/</code> folder for a quick visual check on
-          <strong>GitHub Pages</strong>. It does not run the app — use your deployed Next.js URL for live testing.
+          <strong>GitHub Pages only serves this static page.</strong> The seller dashboard, admin console,
+          APIs, and WhatsApp webhooks live in the <strong>Next.js app</strong>, which must be deployed
+          separately (this repo is set up for <strong>Vercel</strong>).
         </p>
       </header>
+
+      <section class="card deploy">
+        <h2>Run the real Porter app</h2>
+        <p class="muted" style="margin-top: 0">
+          One click imports this repo into Vercel. After the first deploy finishes, open your
+          <code>*.vercel.app</code> URL, copy every variable from <code>.env.example</code> into the
+          Vercel project <strong>Settings → Environment Variables</strong>, and set
+          <code>NEXT_PUBLIC_APP_URL</code> to that same URL so auth redirects and <code>/track/…</code> links work.
+        </p>
+        <div class="actions">
+          <a
+            class="btn primary"
+            href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fruddvz%2FPorter&amp;project-name=porter"
+            target="_blank"
+            rel="noopener"
+            >Deploy on Vercel</a
+          >
+          <!-- INJECT_LIVE_APP_START -->
+          <!-- INJECT_LIVE_APP_END -->
+          <a
+            class="btn"
+            href="https://github.com/ruddvz/Porter/blob/main/README.md#quick-start"
+            target="_blank"
+            rel="noopener"
+            >Env checklist (README)</a
+          >
+        </div>
+      </section>
 
       <section class="card">
         <h2>Where to see the real UI</h2>
@@ -25,14 +54,16 @@
           <li><strong>Admin console</strong> — Platform overview, live activity feed, CSV export link.</li>
         </ul>
         <p class="muted">
-          Deploy the Next.js app (Vercel, Cloudflare, etc.) and set <code>NEXT_PUBLIC_APP_URL</code> so tracking links work.
+          Optional: in this GitHub repo, add a variable <code>PORTER_LIVE_URL</code> (Settings → Secrets and
+          variables → Actions → Variables) with your production URL; the next Pages deploy will show an
+          <strong>Open live app</strong> button above.
         </p>
       </section>
 
       <section class="card">
         <h2>Quick links</h2>
         <div class="actions">
-          <a class="btn primary" href="https://github.com/ruddvz/Porter" target="_blank" rel="noopener">Repository</a>
+          <a class="btn" href="https://github.com/ruddvz/Porter" target="_blank" rel="noopener">Repository</a>
           <a class="btn" href="status.html">Feature checklist</a>
         </div>
       </section>

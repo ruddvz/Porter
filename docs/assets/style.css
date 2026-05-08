@@ -55,6 +55,10 @@ body {
   padding: 1.25rem 1.35rem;
   margin-top: 1.25rem;
 }
+.card.deploy {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px rgba(37, 211, 102, 0.12);
+}
 .card h2 {
   margin: 0 0 0.75rem;
   font-size: 1.1rem;
