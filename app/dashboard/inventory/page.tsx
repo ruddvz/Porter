@@ -15,6 +15,7 @@ export default async function InventoryPage() {
     .from("products")
     .select("*")
     .eq("seller_id", seller.id)
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
   return <InventoryClient seller={seller} initialProducts={products ?? []} />;

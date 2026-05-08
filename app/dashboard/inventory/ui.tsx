@@ -11,10 +11,29 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Drawer } from "@/components/ui/Drawer";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { Pencil, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Pencil, Trash2, GripVertical } from "lucide-react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  DndContext,
+  closestCenter,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/cn";
 
 const PRESET_CATEGORIES = ["Vegetables", "Dairy", "Staples", "Beverages", "Snacks", "Household", "Other"];
 const UNITS = ["kg", "litre", "pkt", "piece", "dozen", "box"] as const;
@@ -33,6 +52,105 @@ function stockLevelVariant(p: Product): "cancelled" | "cod" {
   return sq <= 0 ? "cancelled" : "cod";
 }
 
+function SortableProductListRow({
+  product: p,
+  editMode,
+  selected,
+  toggleSelect,
+  onEdit,
+  onDelete,
+  supabase,
+  setProducts,
+  toast,
+}: {
+  product: Product;
+  editMode: boolean;
+  selected: Record<string, boolean>;
+  toggleSelect: (id: string) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  supabase: ReturnType<typeof createSupabaseBrowserClient>;
+  setProducts: Dispatch<SetStateAction<Product[]>>;
+  toast: (msg: string, variant: "success" | "error") => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: p.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 rounded-xl border border-porter-bg-border bg-porter-bg-surface px-3 py-3",
+        isDragging && "opacity-70 ring-2 ring-porter-green-500/40",
+      )}
+    >
+      <button
+        type="button"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-porter-text-muted hover:bg-porter-bg-raised"
+        aria-label="Drag to reorder"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-5 w-5" />
+      </button>
+      {editMode && (
+        <input type="checkbox" checked={!!selected[p.id]} onChange={() => toggleSelect(p.id)} className="h-5 w-5 accent-porter-green-500" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-porter-text-primary">{p.name}</p>
+        <p className="text-xs text-porter-text-muted">
+          ₹{p.price} / {p.unit}
+          {p.category ? ` · ${p.category}` : ""}
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-1">
+        <button
+          type="button"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-porter-text-muted hover:bg-porter-bg-raised"
+          aria-label="Edit"
+          onClick={onEdit}
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-porter-text-muted hover:text-porter-status-cancelled"
+          aria-label="Delete"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      <label className="hidden sm:flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-porter-bg-border bg-porter-bg-raised px-2">
+        <span className="text-xs text-porter-text-muted">Bot</span>
+        <input
+          type="checkbox"
+          checked={isProductListedForBot(p)}
+          onChange={async (e) => {
+            const listed = e.target.checked;
+            const snapshot = {
+              in_stock: p.in_stock,
+              is_active: p.is_active !== false,
+              stock_quantity: p.stock_quantity ?? (p.in_stock ? 1 : 0),
+            };
+            const next = listed
+              ? { is_active: true, stock_quantity: Math.max(1, snapshot.stock_quantity || 1), in_stock: true }
+              : { is_active: false, stock_quantity: 0, in_stock: false };
+            setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...next } : x)));
+            const { error } = await supabase.from("products").update(next).eq("id", p.id);
+            if (error) {
+              setProducts((list) => list.map((x) => (x.id === p.id ? { ...x, ...snapshot } : x)));
+              toast(error.message, "error");
+            }
+          }}
+          className="h-5 w-5 accent-porter-green-500"
+        />
+      </label>
+    </div>
+  );
+}
+
 export default function InventoryClient({ seller, initialProducts }: { seller: Seller; initialProducts: Product[] }) {
   const supabase = createSupabaseBrowserClient();
   const { push: toast } = useToast();
@@ -49,7 +167,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
   const [bulkCategoryPreset, setBulkCategoryPreset] = useState(() => PRESET_CATEGORIES[0] ?? "Other");
   const [bulkCategoryCustom, setBulkCategoryCustom] = useState("");
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
-  type SortKey = "name" | "price_asc" | "price_desc" | "stock_low" | "category";
+  type SortKey = "name" | "price_asc" | "price_desc" | "stock_low" | "category" | "custom";
   const [sortBy, setSortBy] = useState<SortKey>("name");
 
   const categories = useMemo(() => {
@@ -79,6 +197,8 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           return (a.stock_quantity ?? (a.in_stock ? 1 : 0)) - (b.stock_quantity ?? (b.in_stock ? 1 : 0));
         case "category":
           return (a.category ?? "").localeCompare(b.category ?? "") || a.name.localeCompare(b.name);
+        case "custom":
+          return ((a.sort_order ?? 0) - (b.sort_order ?? 0)) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         default:
           return 0;
       }
@@ -88,6 +208,32 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
 
   const selectedIds = Object.keys(selected).filter((k) => selected[k]);
   const selectedCount = selectedIds.length;
+
+  const productSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const nextSortOrder = useMemo(() => products.reduce((m, p) => Math.max(m, p.sort_order ?? 0), 0) + 1, [products]);
+
+  async function persistSortOrder(ordered: Product[]) {
+    await Promise.all(ordered.map((p, i) => supabase.from("products").update({ sort_order: i }).eq("id", p.id)));
+  }
+
+  function onProductDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = sortedFiltered.map((p) => p.id);
+    const oldIndex = ids.indexOf(active.id as string);
+    const newIndex = ids.indexOf(over.id as string);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reordered = arrayMove(sortedFiltered, oldIndex, newIndex);
+    setProducts((prev) => {
+      const rank = new Map(reordered.map((p, i) => [p.id, i]));
+      return prev.map((p) => (rank.has(p.id) ? { ...p, sort_order: rank.get(p.id)! } : p));
+    });
+    void persistSortOrder(reordered);
+  }
 
   function toggleSelect(id: string) {
     setSelected((s) => ({ ...s, [id]: !s[id] }));
@@ -187,6 +333,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
             <option value="price_asc">Price (low → high)</option>
             <option value="price_desc">Price (high → low)</option>
             <option value="stock_low">Stock (low first)</option>
+            <option value="custom">Custom order (drag)</option>
           </Input.Select>
           <Button type="button" variant={editMode ? "primary" : "secondary"} onClick={() => setEditMode((v) => !v)}>
             Edit mode
@@ -223,6 +370,31 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
         ))}
       </div>
 
+      {sortBy === "custom" ? (
+        <div className="space-y-2">
+          <p className="text-xs text-porter-text-muted">Drag rows to reorder — order is saved for WhatsApp-style listings.</p>
+          <DndContext sensors={productSensors} collisionDetection={closestCenter} onDragEnd={onProductDragEnd}>
+            <SortableContext items={sortedFiltered.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {sortedFiltered.map((p) => (
+                  <SortableProductListRow
+                    key={p.id}
+                    product={p}
+                    editMode={editMode}
+                    selected={selected}
+                    toggleSelect={toggleSelect}
+                    onEdit={() => setModal(p)}
+                    onDelete={() => setDeleteProduct(p)}
+                    supabase={supabase}
+                    setProducts={setProducts}
+                    toast={toast}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {sortedFiltered.map((p) => (
           <Card key={p.id} variant="glow" padding="md" className="relative">
@@ -307,6 +479,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           </Card>
         ))}
       </div>
+      )}
 
       {sortedFiltered.length === 0 && <EmptyState title="No products match" description="Try a different search or category." />}
 
@@ -335,6 +508,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           seller={seller}
           product={modal === "new" ? null : modal}
           productCount={products.length}
+          nextSortOrder={nextSortOrder}
           onClose={() => setModal(null)}
           onSaved={(p) => {
             if (modal === "new") setProducts((prev) => [p, ...prev]);
@@ -458,12 +632,15 @@ function ProductModal({
   seller,
   product,
   productCount,
+  nextSortOrder,
   onClose,
   onSaved,
 }: {
   seller: Seller;
   product: Product | null;
   productCount: number;
+  /** Next `sort_order` for newly created products (Plan0 §5). */
+  nextSortOrder: number;
   onClose: () => void;
   onSaved: (p: Product) => void;
 }) {
@@ -618,6 +795,7 @@ function ProductModal({
       stock_quantity: listed ? Math.max(1, sq) : 0,
       is_active: listed,
       in_stock: listed,
+      ...(product ? {} : { sort_order: nextSortOrder }),
     };
     if (product) {
       const { data, error } = await supabase.from("products").update(row).eq("id", product.id).select("*").single();
@@ -633,10 +811,11 @@ function ProductModal({
   }
 
   return (
-    <Modal
+    <Drawer
       open
       onClose={onClose}
       title={product ? "Edit product" : "Add product"}
+      className="sm:max-w-[480px]"
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -761,6 +940,6 @@ function ProductModal({
           <p className="text-xs text-porter-text-muted">Starter plan: up to 50 products. Upgrade for unlimited.</p>
         )}
       </div>
-    </Modal>
+    </Drawer>
   );
 }

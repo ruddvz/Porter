@@ -1,6 +1,6 @@
+import { apiErr, apiOk } from "@/lib/api-json";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
-import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -10,19 +10,19 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return apiErr("Unauthorized", 401, "401");
 
   let body: { seller_id?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "Bad JSON" }, { status: 400 });
+    return apiErr("Bad JSON", 400);
   }
   const sellerId = body.seller_id;
-  if (!sellerId) return NextResponse.json({ error: "seller_id required" }, { status: 400 });
+  if (!sellerId) return apiErr("seller_id required", 400);
 
   const { data: row } = await supabase.from("sellers").select("id, store_name").eq("id", sellerId).eq("user_id", user.id).maybeSingle();
-  if (!row) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!row) return apiErr("Forbidden", 403, "403");
 
   const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   const secret = process.env.PUSH_INTERNAL_SECRET;
@@ -49,5 +49,5 @@ export async function POST(req: Request) {
     notes: row.store_name,
   });
 
-  return NextResponse.json({ ok: true });
+  return apiOk({ ok: true });
 }

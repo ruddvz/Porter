@@ -1,5 +1,6 @@
 "use client";
 
+import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/Button";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -34,16 +35,14 @@ export default function OnboardingForm() {
         body: JSON.stringify({ phone_number_id: metaPhoneId, access_token: metaToken }),
       });
       const j = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        display_phone_number?: string | null;
-        verified_name?: string | null;
+        data?: { display_phone_number?: string | null; verified_name?: string | null };
+        error?: { message?: string } | null;
       };
-      if (!j.ok) {
-        setError(j.error || "Connection failed");
+      if (!res.ok || j.error) {
+        setError(j.error?.message || "Connection failed");
         return;
       }
-      const line = [j.verified_name, j.display_phone_number].filter(Boolean).join(" · ");
+      const line = [j.data?.verified_name, j.data?.display_phone_number].filter(Boolean).join(" · ");
       setMetaOk(line || "Connected — token is valid.");
     } catch {
       setError("Could not reach test endpoint");
@@ -86,6 +85,17 @@ export default function OnboardingForm() {
       setError(insErr.message);
       return;
     }
+    try {
+      confetti({
+        particleCount: 120,
+        spread: 70,
+        origin: { y: 0.65 },
+        colors: ["#25D366", "#ffffff", "#128C7E"],
+      });
+    } catch {
+      /* ignore */
+    }
+    await new Promise((r) => setTimeout(r, 450));
     if (inserted?.id) {
       void fetch("/api/internal/after-seller-created", {
         method: "POST",

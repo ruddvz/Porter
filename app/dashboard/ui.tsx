@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardHomeInsights from "@/components/dashboard/DashboardHomeInsights";
 import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +21,7 @@ import {
   timeAgoLabel,
 } from "@/lib/orders-ui";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import type { Order, OrderStatus, Seller } from "@/types";
+import type { Order, OrderStatus, Product, Seller } from "@/types";
 import {
   DndContext,
   DragEndEvent,
@@ -234,9 +235,11 @@ function OrderRowQuickActions({
 export default function LiveOrdersBoard({
   seller,
   initialOrders,
+  lowStockProducts,
 }: {
   seller: Seller;
   initialOrders: OrderWithItems[];
+  lowStockProducts: Product[];
 }) {
   const { push: toast } = useToast();
   const nowMs = useSharedNow();
@@ -446,6 +449,8 @@ export default function LiveOrdersBoard({
           />
           <StatCard label="Paid orders" value={stats.paidCount} valueTone="success" />
         </div>
+
+        <DashboardHomeInsights orders={typed} lowStockProducts={lowStockProducts} />
 
         <Card padding="md" className="mt-4 space-y-3">
           <p className="text-label text-porter-text-muted">Kanban date range</p>

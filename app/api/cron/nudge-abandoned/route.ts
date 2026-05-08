@@ -1,7 +1,7 @@
 import { sendMessage } from "@/lib/meta-whatsapp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import type { Conversation, ConversationContext, Seller } from "@/types";
-import { NextResponse } from "next/server";
+import { apiErr, apiOk } from "@/lib/api-json";
 
 export const runtime = "nodejs";
 
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
   if (!secret || auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiErr("Unauthorized", 401, "401");
   }
 
   const supabase = createSupabaseServiceRoleClient();
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
   if (error) {
     console.error("[cron nudge] query", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiErr(error.message, 500);
   }
 
   for (const conv of rows ?? []) {
@@ -151,5 +151,5 @@ Your payment link is waiting — complete payment when you're ready, or reply if
     }
   }
 
-  return NextResponse.json({ nudged, skipped, errors });
+  return apiOk({ nudged, skipped, errors });
 }

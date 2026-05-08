@@ -17,9 +17,14 @@ export default function AdminSettingsClient() {
   useEffect(() => {
     void fetch("/api/admin/platform-settings")
       .then((r) => r.json())
-      .then((d) => {
-        setRow(d as PlatformSettings);
-        setAnnouncement((d as PlatformSettings).announcement ?? "");
+      .then((payload: { data?: unknown; error?: { message?: string } | null }) => {
+        if (payload.error || payload.data == null) {
+          setLoading(false);
+          return;
+        }
+        const d = payload.data as PlatformSettings;
+        setRow(d);
+        setAnnouncement(d.announcement ?? "");
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -40,7 +45,8 @@ export default function AdminSettingsClient() {
       }),
     });
     setSaving(false);
-    if (!res.ok) toast((await res.json()).error ?? "Save failed", "error");
+    const payload = (await res.json().catch(() => ({}))) as { error?: { message?: string } | null };
+    if (!res.ok) toast(payload.error?.message ?? "Save failed", "error");
     else toast("Platform settings saved", "success");
   }
 

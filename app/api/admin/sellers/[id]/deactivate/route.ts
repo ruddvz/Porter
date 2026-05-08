@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { apiErr, apiOk } from "@/lib/api-json";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -9,15 +9,15 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return apiErr("Unauthorized", 401, "401");
 
   const admin = createSupabaseAdminClient();
   const { data: adminRow } = await admin.from("admin_users").select("id").eq("user_id", user.id).maybeSingle();
-  if (!adminRow) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!adminRow) return apiErr("Forbidden", 403, "403");
 
   const sellerId = params.id;
   const { error } = await admin.from("sellers").update({ is_active: false }).eq("id", sellerId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return apiErr(error.message, 500);
 
   const { logPlatformEvent } = await import("@/lib/log-platform-event");
   await logPlatformEvent({
@@ -27,5 +27,5 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     notes: null,
   });
 
-  return NextResponse.json({ ok: true });
+  return apiOk({ ok: true });
 }

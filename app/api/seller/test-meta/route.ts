@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { apiErr, apiOk } from "@/lib/api-json";
 
 export const runtime = "nodejs";
 
@@ -10,12 +10,12 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as { phone_number_id?: string; access_token?: string };
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+    return apiErr("Invalid JSON", 400, "400");
   }
   const phoneId = body.phone_number_id?.trim();
   const token = body.access_token?.trim();
   if (!phoneId || !token) {
-    return NextResponse.json({ ok: false, error: "phone_number_id and access_token are required" }, { status: 400 });
+    return apiErr("phone_number_id and access_token are required", 400, "400");
   }
 
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(phoneId)}?fields=display_phone_number,verified_name,quality_rating`;
@@ -30,18 +30,14 @@ export async function POST(req: Request) {
       error?: { message?: string };
     };
     if (!res.ok) {
-      return NextResponse.json({
-        ok: false,
-        error: json.error?.message || `Meta API error (${res.status})`,
-      });
+      return apiErr(json.error?.message || `Meta API error (${res.status})`, res.status >= 400 && res.status < 600 ? res.status : 502);
     }
-    return NextResponse.json({
-      ok: true,
+    return apiOk({
       display_phone_number: json.display_phone_number ?? null,
       verified_name: json.verified_name ?? null,
     });
   } catch (e) {
     console.error("[test-meta]", e);
-    return NextResponse.json({ ok: false, error: "Network error calling Meta" }, { status: 502 });
+    return apiErr("Network error calling Meta", 502, "502");
   }
 }

@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Table } from "@/components/ui/Table";
 import { useToast } from "@/components/ui/Toast";
+import PushPrompt from "@/components/dashboard/PushPrompt";
 import { useMemo, useState } from "react";
 
-type Tab = "store" | "delivery" | "payments" | "bot" | "hours" | "meta" | "subscription" | "growth" | "danger";
+type Tab = "store" | "delivery" | "payments" | "bot" | "hours" | "meta" | "subscription" | "growth" | "notifications" | "danger";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -160,8 +161,8 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
           }),
         });
         if (enc.ok) {
-          const j = (await enc.json()) as { ok?: boolean };
-          if (j.ok) toast("Sensitive fields encrypted at rest.", "success");
+          const j = (await enc.json()) as { data?: { ok?: boolean } | null; error?: { message?: string } | null };
+          if (j.data?.ok) toast("Sensitive fields encrypted at rest.", "success");
         }
       }
     }
@@ -207,8 +208,8 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
           body: JSON.stringify({ meta_access_token: metaToken.trim() }),
         });
         if (enc.ok) {
-          const j = (await enc.json()) as { ok?: boolean };
-          if (j.ok) toast("Access token encrypted at rest.", "success");
+          const j = (await enc.json()) as { data?: { ok?: boolean } | null; error?: { message?: string } | null };
+          if (j.data?.ok) toast("Access token encrypted at rest.", "success");
         }
       }
       setMetaToken("");
@@ -257,12 +258,15 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
       body: JSON.stringify({ message: broadcastText.trim() }),
     });
     setBusy(false);
-    const j = (await res.json().catch(() => ({}))) as { error?: string; sent?: number };
-    if (!res.ok) {
-      toast(j.error ?? "Broadcast failed", "error");
+    const j = (await res.json().catch(() => ({}))) as {
+      data?: { sent?: number };
+      error?: { message?: string } | null;
+    };
+    if (!res.ok || j.error) {
+      toast(j.error?.message ?? "Broadcast failed", "error");
       return;
     }
-    toast(`Sent to ${j.sent ?? 0} customers`, "success");
+    toast(`Sent to ${j.data?.sent ?? 0} customers`, "success");
     setBroadcastText("");
   }
 
@@ -270,9 +274,12 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
     setBusy(true);
     const res = await fetch("/api/billing/status");
     setBusy(false);
-    const j = (await res.json().catch(() => ({}))) as { message?: string; plan?: string };
-    if (res.ok) setBillingInfo(`${j.message ?? ""} (plan: ${j.plan ?? "—"})`);
-    else setBillingInfo("Could not load billing status.");
+    const j = (await res.json().catch(() => ({}))) as {
+      data?: { message?: string; plan?: string };
+      error?: { message?: string } | null;
+    };
+    if (res.ok && j.data) setBillingInfo(`${j.data.message ?? ""} (plan: ${j.data.plan ?? "—"})`);
+    else setBillingInfo(j.error?.message ?? "Could not load billing status.");
   }
 
   async function deactivate() {
@@ -294,6 +301,7 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
         { id: "meta" as const, label: "WhatsApp API" },
         { id: "subscription" as const, label: "Plan" },
         { id: "growth" as const, label: "Growth" },
+        { id: "notifications" as const, label: "Notifications" },
         { id: "danger" as const, label: "Danger" },
       ] as const,
     [],
@@ -644,6 +652,8 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
           )}
         </Card>
       )}
+
+      {tab === "notifications" && <PushPrompt seller={seller} variant="settings" />}
 
       {tab === "danger" && (
         <Card padding="lg" className="space-y-4 border-porter-status-cancelled/40">

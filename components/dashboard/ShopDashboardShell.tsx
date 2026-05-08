@@ -2,9 +2,10 @@
 
 import { Sidebar, type SidebarNavItem } from "@/components/ui/Sidebar";
 import TopBar, { type TopBarRecentOrder } from "@/components/dashboard/TopBar";
-import InstallPrompt from "@/components/dashboard/InstallPrompt";
+import PWAInstallBanner from "@/components/dashboard/PWAInstallBanner";
 import PushPrompt from "@/components/dashboard/PushPrompt";
 import { registerSellerServiceWorker } from "@/lib/registerServiceWorker";
+import { useSellerPendingOrdersRealtime } from "@/lib/hooks/useSellerPendingOrdersRealtime";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
 import { cn } from "@/lib/cn";
@@ -39,17 +40,20 @@ export default function ShopDashboardShell({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNav, setMobileNav] = useState(false);
+  const liveOrders = useSellerPendingOrdersRealtime(seller.id, pendingOrderCount, recentPendingOrders);
+  const badgeCount = liveOrders.pendingOrderCount;
+  const bellRecent = liveOrders.recentPendingOrders;
 
   const items: SidebarNavItem[] = useMemo(
     () => [
-      { href: "/dashboard", label: "Live Orders", icon: LayoutDashboard, badge: pendingOrderCount > 0 ? pendingOrderCount : undefined },
+      { href: "/dashboard", label: "Live Orders", icon: LayoutDashboard, badge: badgeCount > 0 ? badgeCount : undefined },
       { href: "/dashboard/orders", label: "History", icon: ScrollText },
       { href: "/dashboard/conversations", label: "Chats", icon: MessageCircle },
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/inventory", label: "Inventory", icon: Package },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
-    [pendingOrderCount],
+    [badgeCount],
   );
 
   async function logout() {
@@ -85,8 +89,8 @@ export default function ShopDashboardShell({
         <TopBar
           title={title}
           seller={seller}
-          pendingOrderCount={pendingOrderCount}
-          recentPendingOrders={recentPendingOrders}
+          pendingOrderCount={badgeCount}
+          recentPendingOrders={bellRecent}
           onOpenNav={() => setMobileNav(true)}
           impersonating={impersonating}
         />
@@ -96,7 +100,7 @@ export default function ShopDashboardShell({
           </div>
           {children}
         </main>
-        <InstallPrompt />
+        <PWAInstallBanner />
 
         <nav
           className="fixed bottom-0 left-0 right-0 z-30 border-t border-porter-bg-border bg-porter-bg-base/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"

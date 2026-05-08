@@ -1,5 +1,5 @@
+import { apiErr, apiOk } from "@/lib/api-json";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -12,12 +12,12 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return apiErr("Unauthorized", 401, "401");
 
   const { data: seller } = await supabase.from("sellers").select("plan").eq("user_id", user.id).maybeSingle();
 
-  return NextResponse.json({
-    mode: "manual",
+  return apiOk({
+    mode: "manual" as const,
     message:
       "Subscription upgrades are handled manually for now. Contact Porter support or use the Growth upgrade flow when available.",
     plan: seller?.plan ?? "starter",

@@ -1,6 +1,6 @@
 import webpush from "web-push";
+import { apiErr, apiOk } from "@/lib/api-json";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
-import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -16,17 +16,17 @@ function configureWebPush() {
 export async function POST(req: Request) {
   const secret = process.env.PUSH_INTERNAL_SECRET;
   if (!secret || req.headers.get("x-porter-push-secret") !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiErr("Unauthorized", 401, "401");
   }
   if (!configureWebPush()) {
-    return NextResponse.json({ error: "VAPID not configured" }, { status: 503 });
+    return apiErr("VAPID not configured", 503, "503");
   }
 
   let body: { seller_id?: string; title?: string; body?: string; admin_broadcast?: boolean };
   try {
     body = (await req.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "Bad JSON" }, { status: 400 });
+    return apiErr("Bad JSON", 400);
   }
 
   const supabase = createSupabaseServiceRoleClient();
@@ -45,11 +45,11 @@ export async function POST(req: Request) {
         console.error("[push send] admin", e);
       }
     }
-    return NextResponse.json({ sent });
+    return apiOk({ sent });
   }
 
   const sellerId = body.seller_id;
-  if (!sellerId) return NextResponse.json({ error: "seller_id required" }, { status: 400 });
+  if (!sellerId) return apiErr("seller_id required", 400);
 
   const { data: subs } = await supabase
     .from("seller_push_subscriptions")
@@ -72,5 +72,5 @@ export async function POST(req: Request) {
       console.error("[push send] seller", e);
     }
   }
-  return NextResponse.json({ sent });
+  return apiOk({ sent });
 }
