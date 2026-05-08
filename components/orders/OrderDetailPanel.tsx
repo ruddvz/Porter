@@ -5,11 +5,12 @@ import { formatCurrencyInr, orderStatusBadge, paymentBadge } from "@/lib/orders-
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Drawer } from "@/components/ui/Drawer";
 import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import type { Order, Seller } from "@/types";
-import { Copy, GripHorizontal, MapPin, MessageCircle, Printer, X } from "lucide-react";
+import { Copy, MapPin, MessageCircle, Printer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 function escapeHtml(s: string) {
@@ -163,21 +164,18 @@ export default function OrderDetailPanel({
   const cancelOrder = useCallback(async () => {
     if (!o) return;
     if (o.status !== "pending" && o.status !== "confirmed" && o.status !== "preparing" && o.status !== "paid") return;
-    setBusy(true);
     const prev = { ...o };
     const updates = { status: "cancelled" as const };
     onOrderUpdate?.({ ...o, ...updates });
     const { error } = await supabase.from("orders").update(updates).eq("id", o.id);
-    setBusy(false);
     if (error) {
       onOrderUpdate?.(prev);
       toast(error.message, "error");
-    } else {
-      toast("Order cancelled", "success");
-      setCancelOpen(false);
-      onSaved();
-      onClose();
+      throw new Error(error.message);
     }
+    toast("Order cancelled", "success");
+    onSaved();
+    onClose();
   }, [o, onOrderUpdate, onSaved, onClose, supabase, toast]);
 
   const printOrder = useCallback(() => {
@@ -194,29 +192,33 @@ export default function OrderDetailPanel({
       ) ?? [];
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt ${escapeHtml(o.id.slice(0, 8))}</title>
 <style>
-  body{font-family:system-ui,-apple-system,sans-serif;padding:24px;max-width:480px;margin:0 auto;color:#111}
-  h1{font-size:1.25rem;margin:0 0 4px}
-  .muted{color:#555;font-size:12px}
-  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
-  th{text-align:left;border-bottom:1px solid #ddd;padding:8px 4px}
-  td{padding:8px 4px;border-bottom:1px solid #eee}
-  .num{text-align:right;font-variant-numeric:tabular-nums}
-  .tot{margin-top:16px;font-size:15px}
-  .grand{font-weight:700;font-size:18px;margin-top:8px}
-  @media print{body{padding:12px}}
+  :root { color-scheme: dark; }
+  body{font-family:ui-sans-serif,system-ui,sans-serif;padding:28px;max-width:520px;margin:0 auto;background:#0a0f0d;color:#e8f5e9;line-height:1.45}
+  h1{font-size:1.35rem;margin:0 0 6px;font-weight:700;letter-spacing:0.02em;color:#25d366}
+  .muted{color:#a3b8a8;font-size:12px}
+  .line{height:1px;background:#1e2d22;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
+  th{text-align:left;border-bottom:1px solid #1e2d22;padding:10px 6px;color:#5c7a63;font-size:11px;text-transform:uppercase;letter-spacing:0.06em}
+  td{padding:10px 6px;border-bottom:1px solid #162019}
+  .num{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
+  .tot{margin-top:14px;font-size:15px;display:flex;justify-content:space-between;color:#a3b8a8}
+  .grand{font-weight:700;font-size:18px;margin-top:10px;display:flex;justify-content:space-between;color:#f5fcf7}
+  .accent{color:#25d366}
+  @media print{body{padding:16px;background:#fff;color:#111}.muted{color:#555}th{color:#666}td{border-color:#eee}.grand,.accent{color:#111}}
 </style></head><body>
   <h1>${escapeHtml(seller.store_name)}</h1>
-  <p class="muted">${seller.city ? escapeHtml(seller.city) + " · " : ""}Order #${escapeHtml(o.id.slice(0, 8))}</p>
-  <p class="muted">${new Date(o.created_at).toLocaleString()}</p>
+  <p class="muted">${seller.city ? escapeHtml(seller.city) + " · " : ""}<span class="accent">Order #${escapeHtml(o.id.slice(0, 8))}</span></p>
+  <p class="muted">${new Date(o.created_at).toLocaleString("en-IN")}</p>
+  <div class="line"></div>
   <p><strong>${escapeHtml(o.customer_name || "Customer")}</strong><br/><span class="muted">${escapeHtml(o.customer_phone)}</span></p>
-  <p class="muted">${escapeHtml(o.delivery_area || "")} ${escapeHtml(o.delivery_address || "")}</p>
+  <p class="muted">${escapeHtml([o.delivery_area, o.delivery_address].filter(Boolean).join(" · "))}</p>
   <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Line</th></tr></thead><tbody>
   ${rows.join("")}
   </tbody></table>
-  <div class="tot">Subtotal <span style="float:right">₹${sub.toFixed(2)}</span></div>
-  ${fee > 0 ? `<div class="tot">Delivery <span style="float:right">₹${fee.toFixed(2)}</span></div>` : ""}
-  <div class="grand">Total <span style="float:right">₹${grand.toFixed(2)}</span></div>
-  <p class="muted" style="margin-top:24px">Thank you for your order.</p>
+  <div class="tot"><span>Subtotal</span><span>₹${sub.toFixed(2)}</span></div>
+  ${fee > 0 ? `<div class="tot"><span>Delivery</span><span>₹${fee.toFixed(2)}</span></div>` : ""}
+  <div class="grand"><span>Total</span><span>₹${grand.toFixed(2)}</span></div>
+  <p class="muted" style="margin-top:28px;text-align:center">Thank you — Porter receipt</p>
 </body></html>`;
     w.document.write(html);
     w.document.close();
@@ -235,217 +237,22 @@ export default function OrderDetailPanel({
 
   return (
     <>
-      <div className="fixed inset-0 z-[90] bg-black/50 lg:bg-black/40" aria-hidden onClick={onClose} />
-      <aside
-        className="fixed inset-x-0 bottom-0 z-[95] flex max-h-[85vh] flex-col rounded-t-2xl border border-porter-bg-border bg-porter-bg-raised shadow-modal lg:inset-y-0 lg:right-0 lg:left-auto lg:max-h-none lg:w-[400px] lg:rounded-none lg:border-l lg:border-t-0 animate-porter-modal-sheet lg:animate-porter-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="order-detail-title"
-      >
-        <div className="flex shrink-0 items-center justify-center pt-2 lg:hidden">
-          <GripHorizontal className="h-5 w-5 text-porter-text-muted" aria-hidden />
-        </div>
-        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-porter-bg-border px-4 py-3">
-          <div className="min-w-0">
-            <p id="order-detail-title" className="text-mono text-porter-text-muted">
-              {o.id.slice(0, 8)}
-            </p>
-            {statusBadge && <Badge className="mt-2" kind="status" variant={statusBadge.variant} label={statusBadge.label} size="sm" />}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-porter-text-secondary hover:bg-porter-bg-surface hover:text-porter-text-primary"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <section className="space-y-1">
-            <h3 className="text-label text-porter-text-muted">Customer</h3>
-            <p className="text-title text-porter-text-primary">{o.customer_name || "—"}</p>
-            <a className="text-mono text-porter-green-400 hover:underline" href={`tel:${o.customer_phone}`}>
-              {o.customer_phone}
-            </a>
-            <p className="mt-2 flex items-start gap-2 text-body text-porter-text-secondary">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-porter-text-muted" />
-              <span>
-                {o.delivery_area || "—"}
-                <br />
-                {o.delivery_address || "—"}
-              </span>
-            </p>
-            {o.scheduled_for ? (
-              <p className="mt-2 text-sm text-amber-200/90">Requested for: {new Date(o.scheduled_for).toLocaleString()}</p>
-            ) : null}
-          </section>
-
-          <section className="mt-6">
-            <h3 className="text-label text-porter-text-muted">Rider / delivery</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Input.Text
-                id="rider"
-                label="Rider or vehicle note"
-                className="min-w-[200px] flex-1"
-                value={riderLabel}
-                onChange={(e) => setRiderLabel(e.target.value)}
-                onBlur={() => void saveRider()}
-                placeholder="e.g. Blue Activa / Ravi bhai"
-              />
-            </div>
-          </section>
-
-          <section className="mt-6">
-            <h3 className="text-label text-porter-text-muted">Items</h3>
-            <div className="mt-2 overflow-hidden rounded-lg border border-porter-bg-border">
-              <table className="w-full text-left text-body">
-                <thead className="bg-porter-bg-surface text-label text-porter-text-muted">
-                  <tr>
-                    <th className="px-3 py-2">Item</th>
-                    <th className="px-3 py-2">Qty</th>
-                    <th className="px-3 py-2 text-right">Line</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {o.order_items?.map((i) => (
-                    <tr key={i.id} className="border-t border-porter-bg-border">
-                      <td className="px-3 py-2 text-porter-text-primary">{i.product_name}</td>
-                      <td className="px-3 py-2 text-mono text-porter-text-secondary">
-                        {i.quantity} {i.unit}
-                      </td>
-                      <td className="px-3 py-2 text-right text-mono text-porter-text-primary">₹{i.total_price}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-3 flex justify-between text-body text-porter-text-secondary">
-              <span>Subtotal</span>
-              <span className="text-mono text-porter-text-primary">{formatCurrencyInr(o.total_amount)}</span>
-            </div>
-          </section>
-
-          <section className="mt-6 space-y-2">
-            <h3 className="text-label text-porter-text-muted">Payment</h3>
-            {pay && (
-              <div className="flex flex-wrap gap-2">
-                <Badge kind="status" variant={pay.statusVariant} label={pay.label} size="sm" />
-                <span className="rounded-md border border-porter-bg-border bg-porter-bg-surface px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-porter-text-secondary">
-                  {pay.methodLabel}
-                </span>
-              </div>
-            )}
-            {o.payment_method === "cod" && (
-              <p className="text-body text-porter-text-secondary">
-                Cash collected:{" "}
-                <span className="font-semibold text-porter-text-primary">
-                  {o.payment_status === "cod_collected" ? "Yes" : "No"}
-                </span>
-              </p>
-            )}
-            {o.razorpay_payment_link_url && (
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={o.razorpay_payment_link_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-all text-sm font-medium text-porter-green-400 hover:underline"
-                >
-                  {o.razorpay_payment_link_url}
-                </a>
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-porter-bg-border px-2 text-sm text-porter-text-secondary hover:bg-porter-bg-surface"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(o.razorpay_payment_link_url!);
-                    toast("Link copied", "success");
-                  }}
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy
-                </button>
-              </div>
-            )}
-          </section>
-
-          <section className="mt-6">
-            <h3 className="text-label text-porter-text-muted">Timeline</h3>
-            <ol className="mt-3 space-y-3 border-l border-porter-bg-border pl-4">
-              {[
-                { key: "recv", label: "Received", done: true, ts: o.created_at },
-                {
-                  key: "conf",
-                  label: "Confirmed",
-                  done: ["confirmed", "preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
-                  ts: ["confirmed", "preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
-                },
-                {
-                  key: "prep",
-                  label: "In progress",
-                  done: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
-                  ts: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
-                },
-                { key: "paid", label: "Paid", done: o.payment_status === "paid", ts: o.paid_at },
-                {
-                  key: "dispatch",
-                  label: "Dispatched",
-                  done: o.status === "out_for_delivery" || o.status === "delivered",
-                  ts: o.status === "out_for_delivery" || o.status === "delivered" ? o.paid_at ?? o.created_at : null,
-                },
-                { key: "del", label: "Delivered", done: o.status === "delivered", ts: o.delivered_at },
-              ].map((step) => (
-                <li key={step.key} className="relative">
-                  <span
-                    className={`absolute -left-[21px] top-1 flex h-2.5 w-2.5 rounded-full ring-2 ring-porter-bg-raised ${
-                      step.done ? "bg-porter-green-500" : "bg-porter-bg-border"
-                    }`}
-                  />
-                  <p className={`text-sm font-semibold ${step.done ? "text-porter-text-primary" : "text-porter-text-muted"}`}>
-                    {step.label}
-                  </p>
-                  <p className="text-mono text-xs text-porter-text-muted">
-                    {step.ts ? new Date(step.ts as string).toLocaleString() : "—"}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <section className="mt-6">
-            <h3 className="text-label text-porter-text-muted">Activity</h3>
-            {events.length === 0 ? (
-              <p className="mt-2 text-sm text-porter-text-muted">No payment or status events logged yet.</p>
-            ) : (
-              <ul className="mt-3 space-y-2 border-l border-porter-bg-border pl-4">
-                {events.map((ev) => (
-                  <li key={`${ev.event_type}-${ev.created_at}`} className="text-sm">
-                    <span className="font-medium text-porter-text-primary">{ev.event_type.replace(/_/g, " ")}</span>
-                    <span className="text-mono text-xs text-porter-text-muted"> · {new Date(ev.created_at).toLocaleString()}</span>
-                    {ev.note ? <p className="mt-0.5 text-porter-text-secondary">{ev.note}</p> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="mt-6">
-            <h3 className="text-label text-porter-text-muted">Notes</h3>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onBlur={() => void saveNote()}
-              rows={3}
-              className="mt-2 w-full rounded-lg border border-porter-bg-border bg-porter-bg-surface px-3 py-2 text-body text-porter-text-primary outline-none focus:border-porter-green-500 focus:ring-2 focus:ring-porter-green-500/20"
-            />
-          </section>
-        </div>
-
-        <footer className="shrink-0 border-t border-porter-bg-border px-4 py-3">
-          <div className="flex flex-wrap justify-end gap-2">
+      <Drawer
+        open
+        onClose={onClose}
+        title={`Order #${o.id.slice(0, 8)}`}
+        className="sm:max-w-[400px]"
+        footer={
+          <div className="flex w-full flex-wrap justify-end gap-2">
             {o.payment_method === "cod" && o.payment_status === "cod_pending" && (
-              <Button type="button" variant="primary" size="sm" className="bg-porter-orange-500 hover:bg-porter-orange-600" loading={busy} onClick={() => void markCodCollected()}>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="bg-porter-orange-500 hover:bg-porter-orange-600"
+                loading={busy}
+                onClick={() => void markCodCollected()}
+              >
                 Mark cash collected
               </Button>
             )}
@@ -479,27 +286,203 @@ export default function OrderDetailPanel({
               </Button>
             )}
           </div>
-        </footer>
-      </aside>
+        }
+      >
+        <div className="space-y-1 border-b border-porter-bg-border pb-4">
+          <p className="text-mono text-xs text-porter-text-muted">{o.id}</p>
+          {statusBadge ? <Badge kind="status" variant={statusBadge.variant} label={statusBadge.label} size="sm" /> : null}
+        </div>
 
-      <Modal
+        <section className="mt-4 space-y-1">
+          <h3 className="text-label text-porter-text-muted">Customer</h3>
+          <p className="text-title text-porter-text-primary">{o.customer_name || "—"}</p>
+          <a className="text-mono text-porter-green-400 hover:underline" href={`tel:${o.customer_phone}`}>
+            {o.customer_phone}
+          </a>
+          <p className="mt-2 flex items-start gap-2 text-body text-porter-text-secondary">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-porter-text-muted" />
+            <span>
+              {o.delivery_area || "—"}
+              <br />
+              {o.delivery_address || "—"}
+            </span>
+          </p>
+          {o.scheduled_for ? (
+            <p className="mt-2 text-sm text-amber-200/90">Requested for: {new Date(o.scheduled_for).toLocaleString()}</p>
+          ) : null}
+        </section>
+
+        <section className="mt-6">
+          <h3 className="text-label text-porter-text-muted">Rider / delivery</h3>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Input.Text
+              id="rider"
+              label="Rider or vehicle note"
+              className="min-w-[200px] flex-1"
+              value={riderLabel}
+              onChange={(e) => setRiderLabel(e.target.value)}
+              onBlur={() => void saveRider()}
+              placeholder="e.g. Blue Activa / Ravi bhai"
+            />
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <h3 className="text-label text-porter-text-muted">Items</h3>
+          <div className="mt-2 overflow-hidden rounded-lg border border-porter-bg-border">
+            <table className="w-full text-left text-body">
+              <thead className="bg-porter-bg-surface text-label text-porter-text-muted">
+                <tr>
+                  <th className="px-3 py-2">Item</th>
+                  <th className="px-3 py-2">Qty</th>
+                  <th className="px-3 py-2 text-right">Unit</th>
+                  <th className="px-3 py-2 text-right">Line</th>
+                </tr>
+              </thead>
+              <tbody>
+                {o.order_items?.map((i) => (
+                  <tr key={i.id} className="border-t border-porter-bg-border">
+                    <td className="px-3 py-2 text-porter-text-primary">{i.product_name}</td>
+                    <td className="px-3 py-2 text-mono text-porter-text-secondary">
+                      {i.quantity} {i.unit}
+                    </td>
+                    <td className="px-3 py-2 text-right text-mono text-porter-text-secondary">₹{i.unit_price}</td>
+                    <td className="px-3 py-2 text-right text-mono text-porter-text-primary">₹{i.total_price}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 flex justify-between text-body text-porter-text-secondary">
+            <span>Subtotal</span>
+            <span className="text-mono text-porter-text-primary">{formatCurrencyInr(o.total_amount)}</span>
+          </div>
+        </section>
+
+        <section className="mt-6 space-y-2">
+          <h3 className="text-label text-porter-text-muted">Payment</h3>
+          {pay && (
+            <div className="flex flex-wrap gap-2">
+              <Badge kind="status" variant={pay.statusVariant} label={pay.label} size="sm" />
+              <span className="rounded-md border border-porter-bg-border bg-porter-bg-surface px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-porter-text-secondary">
+                {pay.methodLabel}
+              </span>
+            </div>
+          )}
+          {o.payment_method === "cod" && (
+            <p className="text-body text-porter-text-secondary">
+              Cash collected:{" "}
+              <span className="font-semibold text-porter-text-primary">
+                {o.payment_status === "cod_collected" ? "Yes" : "No"}
+              </span>
+            </p>
+          )}
+          {o.razorpay_payment_link_url && (
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={o.razorpay_payment_link_url}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all text-sm font-medium text-porter-green-400 hover:underline"
+              >
+                {o.razorpay_payment_link_url}
+              </a>
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-porter-bg-border px-2 text-sm text-porter-text-secondary hover:bg-porter-bg-surface"
+                onClick={() => {
+                  void navigator.clipboard.writeText(o.razorpay_payment_link_url!);
+                  toast("Link copied", "success");
+                }}
+              >
+                <Copy className="h-4 w-4" />
+                Copy
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6">
+          <h3 className="text-label text-porter-text-muted">Timeline</h3>
+          <ol className="mt-3 space-y-3 border-l border-porter-bg-border pl-4">
+            {[
+              { key: "recv", label: "Received", done: true, ts: o.created_at },
+              {
+                key: "conf",
+                label: "Confirmed",
+                done: ["confirmed", "preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
+                ts: ["confirmed", "preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
+              },
+              {
+                key: "prep",
+                label: "In progress",
+                done: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status),
+                ts: ["preparing", "paid", "out_for_delivery", "delivered"].includes(o.status) ? o.created_at : null,
+              },
+              { key: "paid", label: "Paid", done: o.payment_status === "paid", ts: o.paid_at },
+              {
+                key: "dispatch",
+                label: "Dispatched",
+                done: o.status === "out_for_delivery" || o.status === "delivered",
+                ts: o.status === "out_for_delivery" || o.status === "delivered" ? o.paid_at ?? o.created_at : null,
+              },
+              { key: "del", label: "Delivered", done: o.status === "delivered", ts: o.delivered_at },
+            ].map((step) => (
+              <li key={step.key} className="relative">
+                <span
+                  className={`absolute -left-[21px] top-1 flex h-2.5 w-2.5 rounded-full ring-2 ring-porter-bg-raised ${
+                    step.done ? "bg-porter-green-500" : "bg-porter-bg-border"
+                  }`}
+                />
+                <p className={`text-sm font-semibold ${step.done ? "text-porter-text-primary" : "text-porter-text-muted"}`}>
+                  {step.label}
+                </p>
+                <p className="text-mono text-xs text-porter-text-muted">
+                  {step.ts ? new Date(step.ts as string).toLocaleString() : "—"}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="mt-6">
+          <h3 className="text-label text-porter-text-muted">Activity</h3>
+          {events.length === 0 ? (
+            <p className="mt-2 text-sm text-porter-text-muted">No payment or status events logged yet.</p>
+          ) : (
+            <ul className="mt-3 space-y-2 border-l border-porter-bg-border pl-4">
+              {events.map((ev) => (
+                <li key={`${ev.event_type}-${ev.created_at}`} className="text-sm">
+                  <span className="font-medium text-porter-text-primary">{ev.event_type.replace(/_/g, " ")}</span>
+                  <span className="text-mono text-xs text-porter-text-muted"> · {new Date(ev.created_at).toLocaleString()}</span>
+                  {ev.note ? <p className="mt-0.5 text-porter-text-secondary">{ev.note}</p> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="mt-6">
+          <h3 className="text-label text-porter-text-muted">Notes</h3>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onBlur={() => void saveNote()}
+            rows={3}
+            className="mt-2 w-full rounded-lg border border-porter-bg-border bg-porter-bg-surface px-3 py-2 text-body text-porter-text-primary outline-none focus:border-porter-green-500 focus:ring-2 focus:ring-porter-green-500/20"
+          />
+        </section>
+      </Drawer>
+
+      <ConfirmDialog
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
         title="Cancel this order?"
-        mobileSheet
-        footer={
-          <>
-            <Button type="button" variant="ghost" onClick={() => setCancelOpen(false)}>
-              Back
-            </Button>
-            <Button type="button" variant="danger" loading={busy} onClick={() => void cancelOrder()}>
-              Cancel order
-            </Button>
-          </>
-        }
-      >
-        <p className="text-body text-porter-text-secondary">This cannot be undone from the customer chat.</p>
-      </Modal>
+        description="This cannot be undone from the customer chat."
+        confirmLabel="Cancel order"
+        variant="danger"
+        onConfirm={cancelOrder}
+      />
     </>
   );
 }

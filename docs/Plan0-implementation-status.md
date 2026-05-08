@@ -25,9 +25,9 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
 | Industrial dark + `#25D366` accent | **Partial** | Porter uses green accent + `porter-bg-*` palette; not the exact Plan0 neutral ramp (`#0a0a0a` / `#111` …) |
-| Geist + DM Mono + Noto Arabic | **Partial** | **Geist Sans + Geist Mono** on root `<html>` (`geist` package); **DM Mono** for `--font-dm-mono`; Tailwind `sans` prefers DM Sans where loaded (dashboard/marketing). **Noto Arabic** not wired |
+| Geist + DM Mono (India / Latin) | **Partial** | **Geist Sans + Geist Mono** on root `<html>`; **DM Mono** for `--font-dm-mono`; Tailwind `sans` prefers DM Sans where loaded (dashboard/marketing). **Arabic / RTL stack intentionally out of scope** for India-first Porter |
 | CSS variables `--bg-base`, `--accent`, … | **Partial** | Porter `porter-*` Tailwind is canonical; **`--plan0-*` bridge + safe-area** in `globals.css` for gradual alignment |
-| `manifest.json` | **Partial** | Icons 192/512, theme/background, categories, **shortcuts** (orders, history, inventory, **chats**, analytics); no full icon ladder, screenshots, or `display_override` |
+| `manifest.json` | **Partial** | Multiple **icon sizes** (72–512) + `purpose` any/maskable (reuses PNG assets); shortcuts incl. chats; **no screenshots** yet |
 | `sw.js` | **Partial** | Real SW: cache shell, push, notification click; not full Plan0 fetch strategies (network-first pages, etc.) |
 | `/offline` | **Done** | `app/offline/page.tsx` + SW precache / HTML navigate fallback |
 | Root `layout.tsx` fonts + manifest meta + SW | **Partial** | **Geist** + **DM Mono** on root `html`; title template, `viewport`, Apple meta, skip link, unhandled-rejection toast; seller SW on **dashboard shell** only |
@@ -38,8 +38,8 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
-| Split brand + form layout | **Partial** | Real Supabase auth; polish may differ from Plan0 pixel spec |
-| Google OAuth + reset password | **Done** | If env keys configured |
+| Split brand + form layout | **Partial → stronger** | **`AuthShell`** split panel on `lg+` for login, signup, forgot-password; Porter tokens + `Card` + `Input` |
+| Google OAuth + reset password | **Partial** | **Forgot password** at `/auth/forgot-password` (`resetPasswordForEmail`). Google OAuth still optional (needs callback route + env) |
 
 ---
 
@@ -67,7 +67,7 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
 | Kanban + DnD + realtime | **Done** | `@dnd-kit`, columns, swimlane mobile work from consolidated UX PRs |
-| Order drawer, timeline, wa.me | **Partial** | Panel exists; timeline / print receipt / Plan0 polish may vary |
+| Order drawer, timeline, wa.me | **Partial → stronger** | **`OrderDetailPanel`** now uses shared **`Drawer`**; timeline + print receipt (dark Porter-themed print CSS) |
 
 ---
 
@@ -127,7 +127,7 @@ Use this matrix as the single place to see **Plan0 § vs codebase**. Update it w
 | Plan0 item | Status | Notes |
 |-------------|--------|--------|
 | Button, Input, Modal, Toast, Skeleton, EmptyState | **Done** | Under `components/ui/` |
-| Drawer, ConfirmDialog | **Done** | `components/ui/Drawer.tsx`, `ConfirmDialog.tsx`; demos on `/design-system`; **ConfirmDialog** replaces `window.confirm` in inventory + order history |
+| Drawer, ConfirmDialog | **Done** | `Drawer` + `ConfirmDialog`; design-system demos; inventory + order history confirms; **order detail panel** uses `Drawer` |
 | `PWAInstallBanner` | **Partial** | **`InstallPrompt`** in dashboard fulfills same role |
 
 ---
@@ -162,13 +162,12 @@ No application code was committed under the name “Plan0” before offline/PWA 
 ## Suggested improvements (prioritized)
 
 1. **Keep this file updated** when merging Plan0-related PRs so chat history is not the source of truth.
-2. **Conversations + `/api/wa/send`** — largest Plan0-shaped gap for sellers.
-3. **Drawer + ConfirmDialog** — extract from repeated Modal patterns; improves a11y and Plan0 parity.
-4. **Manifest completeness** — maskable icons, shortcut icons per size, screenshots for install UI.
-5. **Font strategy** — decide: migrate toward Plan0 (Geist when framework supports it + DM Mono everywhere), or **edit Plan0.md** to “Porter canonical stack” to avoid duplicate specs.
-6. **Single service worker story** — document why seller SW is dashboard-scoped vs admin; optional shared registration pattern if product allows.
-7. **GitHub Issues / milestone** — one issue per Plan0 §22 queue item for traceability.
-8. **Viewport** — Plan0 suggests `maximumScale: 1`; that hurts accessibility — prefer strong layout + allow zoom unless you have a documented exception.
+2. **Google OAuth** — add `/auth/callback` route + `signInWithOAuth` on login when `NEXT_PUBLIC_*` Google client is configured.
+3. **Manifest screenshots** — add `screenshots` entries once you have stable marketing captures (Plan0 §1.1).
+4. **Dedicated maskable icons** — replace reused `icon-192.png` entries with properly padded maskable assets per size.
+5. **Single service worker story** — document why seller SW is dashboard-scoped vs admin; optional shared registration pattern if product allows.
+6. **GitHub Issues / milestone** — one issue per Plan0 §22 queue item for traceability.
+7. **Viewport** — Plan0 suggests `maximumScale: 1`; that hurts accessibility — prefer strong layout + allow zoom unless you have a documented exception.
 
 ---
 

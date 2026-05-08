@@ -27,6 +27,11 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
+  if (path === "/auth/forgot-password") {
+    if (user) return NextResponse.redirect(new URL("/dashboard", request.url));
+    return response;
+  }
+
   if (path.startsWith("/admin")) {
     if (path === "/admin/login") {
       if (user) {
@@ -54,7 +59,7 @@ export async function middleware(request: NextRequest) {
     login.searchParams.set("next", path);
     return NextResponse.redirect(login);
   }
-  if ((path === "/auth/login" || path === "/auth/signup") && user) {
+  if ((path === "/auth/login" || path === "/auth/signup" || path === "/auth/forgot-password") && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -62,5 +67,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/onboarding", "/auth/login", "/auth/signup", "/admin/:path*", "/track/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/onboarding",
+    "/auth/login",
+    "/auth/signup",
+    "/auth/forgot-password",
+    "/admin/:path*",
+    "/track/:path*",
+  ],
 };
