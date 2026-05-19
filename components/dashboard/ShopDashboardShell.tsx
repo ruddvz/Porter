@@ -9,7 +9,7 @@ import { useSellerPendingOrdersRealtime } from "@/lib/hooks/useSellerPendingOrde
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { Seller } from "@/types";
 import { cn } from "@/lib/cn";
-import { BarChart3, LayoutDashboard, MessageCircle, Package, ScrollText, Settings } from "lucide-react";
+import { BarChart3, FolderTree, LayoutDashboard, MessageCircle, Package, ScrollText, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +20,7 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith("/dashboard/conversations")) return "Chats";
   if (pathname.startsWith("/dashboard/analytics")) return "Analytics";
   if (pathname.startsWith("/dashboard/inventory")) return "Inventory";
+  if (pathname.startsWith("/dashboard/categories")) return "Categories";
   if (pathname.startsWith("/dashboard/settings")) return "Settings";
   return "Dashboard";
 }
@@ -51,6 +52,7 @@ export default function ShopDashboardShell({
       { href: "/dashboard/conversations", label: "Chats", icon: MessageCircle },
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/inventory", label: "Inventory", icon: Package },
+      { href: "/dashboard/categories", label: "Categories", icon: FolderTree },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
     [badgeCount],

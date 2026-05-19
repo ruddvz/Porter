@@ -47,7 +47,7 @@ export async function GET(_req: Request, { params }: { params: { storeSlug: stri
       background: "#FFFAF2",
       text: "#111827",
     },
-    modes: ["button", "catalog", "featured", "search"],
+    modes: ["button", "catalog", "featured", "search", "cart"],
   });
   Object.entries(corsHeaders).forEach(([k, v]) => res.headers.set(k, v));
   return res;
