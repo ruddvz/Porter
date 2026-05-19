@@ -97,8 +97,76 @@ export async function reserveStockForOrder(params: {
   return { ok: true as const };
 }
 
-export function stockDisplayLabel(available: number): string {
+export async function releaseReservationsForOrder(sellerId: string, orderId: string) {
+  const supabase = createSupabaseServiceRoleClient();
+  const { data: rows, error } = await supabase
+    .from("stock_reservations")
+    .select("id, product_id")
+    .eq("seller_id", sellerId)
+    .eq("order_id", orderId)
+    .eq("status", "active");
+  if (error) return { ok: false as const, error: error.message };
+  if (!rows?.length) return { ok: true as const };
+
+  for (const row of rows) {
+    await supabase
+      .from("stock_reservations")
+      .update({ status: "released", released_at: new Date().toISOString() })
+      .eq("id", row.id);
+    const snap = await getProductStockSnapshot(sellerId, row.product_id);
+    const qty = Math.max(0, Math.floor(snap.available));
+    await supabase.from("products").update({ stock_quantity: qty, in_stock: qty > 0 }).eq("id", row.product_id);
+  }
+  return { ok: true as const };
+}
+
+export async function commitSaleForOrder(sellerId: string, orderId: string) {
+  const supabase = createSupabaseServiceRoleClient();
+  const { data: rows, error } = await supabase
+    .from("stock_reservations")
+    .select("id, product_id, quantity")
+    .eq("seller_id", sellerId)
+    .eq("order_id", orderId)
+    .eq("status", "active");
+  if (error) return { ok: false as const, error: error.message };
+  if (!rows?.length) return { ok: true as const };
+
+  for (const row of rows) {
+    await supabase.from("stock_reservations").update({ status: "committed" }).eq("id", row.id);
+    await recordInventoryMovement({
+      sellerId,
+      productId: row.product_id,
+      movementType: "sale",
+      quantityChange: -Number(row.quantity),
+      reason: "Order fulfilled",
+      source: "order",
+      orderId,
+    });
+  }
+  return { ok: true as const };
+}
+
+/** Manual stock add/remove with ledger entry. */
+export async function adjustProductStock(params: {
+  sellerId: string;
+  productId: string;
+  quantityChange: number;
+  reason?: string;
+  movementType?: InventoryMovementType;
+}) {
+  const type = params.movementType ?? (params.quantityChange >= 0 ? "stock_received" : "manual_adjustment");
+  return recordInventoryMovement({
+    sellerId: params.sellerId,
+    productId: params.productId,
+    movementType: type,
+    quantityChange: params.quantityChange,
+    reason: params.reason ?? "Manual adjustment",
+    source: "manual",
+  });
+}
+
+export function stockDisplayLabel(available: number, threshold = 5): string {
   if (available <= 0) return "Sold out";
-  if (available <= 5) return `Only ${available} left`;
+  if (available <= threshold) return `Only ${available} left`;
   return "In stock";
 }

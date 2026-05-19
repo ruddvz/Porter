@@ -111,7 +111,7 @@ export default function DashboardHomeInsights({
 
       <Card padding="md">
         <h2 className="text-title text-porter-text-primary">Low stock</h2>
-        <p className="mt-1 text-xs text-porter-text-muted">Listed catalog items at ≤5 units</p>
+        <p className="mt-1 text-xs text-porter-text-muted">Items at or below your low-stock threshold</p>
         <ul className="mt-3 space-y-2">
           {lowStockProducts.length === 0 ? (
             <li className="text-sm text-porter-text-muted">Nothing flagged.</li>

@@ -284,11 +284,17 @@ export default function OrderHistoryClient({
         onConfirm={async () => {
           if (!cancelTarget) return;
           const id = cancelTarget.id;
+          const prevStatus = cancelTarget.status;
           const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", id);
           if (error) {
             toast(error.message, "error");
             throw new Error(error.message);
           }
+          void fetch(`/api/seller/orders/${id}/inventory-sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ previousStatus: prevStatus, newStatus: "cancelled" }),
+          });
           setOrders((prev) => prev.map((x) => (x.id === id ? { ...x, status: "cancelled" } : x)));
           toast("Order cancelled", "success");
         }}
