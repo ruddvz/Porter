@@ -1,0 +1,28 @@
+# Self-hosted OpenWA gateway for Porter (no Meta per-message fees).
+# @see docs/OpenWA-integration.md
+services:
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:latest
+    ports:
+      - "2785:2785"
+      - "2886:2886"
+    volumes:
+      - openwa-data:/app/data
+    environment:
+      PORT: 2785
+      NODE_ENV: production
+      DATABASE_TYPE: sqlite
+      DATABASE_NAME: ./data/openwa.sqlite
+      DATABASE_SYNCHRONIZE: "true"
+      ENGINE_TYPE: whatsapp-web.js
+      SESSION_DATA_PATH: ./data/sessions
+      PUPPETEER_HEADLESS: "true"
+      PUPPETEER_ARGS: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage"
+      REDIS_ENABLED: "false"
+      QUEUE_ENABLED: "false"
+      CACHE_ENABLED: "false"
+      # Set a strong key and mirror it in Porter OPENWA_API_KEY
+      # API_MASTER_KEY: change-me
+
+volumes:
+  openwa-data:

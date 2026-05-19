@@ -1,0 +1,935 @@
+{
+  "meta": {
+    "project": "PORTER",
+    "file_type": "visual_implementation_blueprint",
+    "version": "1.0",
+    "created_on": "2026-05-19",
+    "purpose": "Screen-by-screen UI/UX and implementation blueprint for Porter inventory, website ordering, WhatsApp commerce, and seller dashboard.",
+    "audience": [
+      "developer",
+      "designer",
+      "AI code builder",
+      "founder",
+      "client implementation team"
+    ],
+    "primary_product_statement": "Add products once. Porter powers live inventory, website ordering, WhatsApp sales, pickup/delivery, payments, and seller operations."
+  },
+  "brand_system": {
+    "visual_direction": "Premium local-retail SaaS with Indian grocery warmth, clean enterprise dashboard structure, rounded cards, emerald green primary, saffron orange accent, cream background, soft shadows.",
+    "colors": {
+      "background": "#FFFAF2",
+      "surface": "#FFFFFF",
+      "surface_soft": "#F8FBF4",
+      "primary": "#0F7A3A",
+      "primary_dark": "#07592A",
+      "accent": "#F26B00",
+      "accent_soft": "#FFF1DF",
+      "warning": "#F4A000",
+      "danger": "#D83B32",
+      "info": "#2563EB",
+      "text": "#111827",
+      "muted": "#667085",
+      "border": "#EADFCE"
+    },
+    "radius": {
+      "small": 10,
+      "medium": 16,
+      "large": 24,
+      "xl": 32,
+      "pill": 999
+    },
+    "shadow": {
+      "card": "0 12px 30px rgba(15, 122, 58, 0.08)",
+      "floating": "0 18px 48px rgba(17, 24, 39, 0.12)"
+    },
+    "typography": {
+      "heading_font": "Inter / Satoshi / Plus Jakarta Sans",
+      "body_font": "Inter / system-ui",
+      "desktop": {
+        "page_title": "32-40px",
+        "section_title": "20-24px",
+        "card_title": "16-18px",
+        "body": "14-16px",
+        "caption": "12-13px"
+      },
+      "mobile": {
+        "page_title": "24-28px",
+        "section_title": "18-20px",
+        "card_title": "15-17px",
+        "body": "14-15px",
+        "caption": "12px"
+      }
+    },
+    "spacing": {
+      "base_grid": 8,
+      "micro": 4,
+      "tight": 8,
+      "compact": 12,
+      "standard": 16,
+      "section": 24,
+      "large_section": 32,
+      "page": 48
+    },
+    "icon_style": "Rounded line icons, 2px stroke, primary green for main icons, orange for warnings/highlights."
+  },
+  "platform_architecture": {
+    "modules": [
+      "Seller Dashboard",
+      "Public Storefront",
+      "Website Integration",
+      "Inventory Service",
+      "Order Service",
+      "WhatsApp Bot",
+      "Payment Service",
+      "Admin Console",
+      "Analytics",
+      "Onboarding"
+    ],
+    "source_of_truth": "Porter owns product catalog and inventory for MVP.",
+    "sync_strategy": {
+      "mvp": "Porter storefront + website order button.",
+      "next": "Embedded catalog widget.",
+      "later": "WooCommerce/Shopify sync."
+    }
+  },
+  "screens": [
+    {
+      "id": "seller_dashboard_home",
+      "name": "Seller Dashboard Home",
+      "route": "/dashboard",
+      "device_priority": "mobile_first",
+      "goal": "Show the store owner what needs attention today.",
+      "layout": {
+        "desktop": "Left sidebar + top header + 12-column content grid.",
+        "mobile": "Sticky top header + stacked cards + bottom nav."
+      },
+      "sections": [
+        {
+          "component": "header",
+          "content": [
+            "Store name",
+            "Greeting",
+            "Store live status",
+            "Notification button",
+            "Profile menu"
+          ],
+          "ux_notes": "Keep compact. Show urgent alerts only."
+        },
+        {
+          "component": "setup_checklist_card",
+          "display_condition": "Show until store is fully launched.",
+          "items": [
+            "Store profile completed",
+            "Products added",
+            "Pickup/delivery configured",
+            "Website button added",
+            "WhatsApp tested",
+            "Store live"
+          ],
+          "primary_action": "Continue setup"
+        },
+        {
+          "component": "metrics_grid",
+          "cards": [
+            {
+              "label": "Today orders",
+              "value_source": "orders.count.today"
+            },
+            {
+              "label": "Pending orders",
+              "value_source": "orders.count.pending"
+            },
+            {
+              "label": "Low stock",
+              "value_source": "inventory.low_stock_count"
+            },
+            {
+              "label": "Sales today",
+              "value_source": "orders.sales.today"
+            }
+          ]
+        },
+        {
+          "component": "quick_actions",
+          "actions": [
+            "Add product",
+            "Import catalog",
+            "View live store",
+            "Copy website button",
+            "Manage orders"
+          ]
+        },
+        {
+          "component": "recent_orders",
+          "limit": 5,
+          "fields": [
+            "order_number",
+            "customer_name",
+            "source",
+            "fulfillment_type",
+            "payment_status",
+            "status",
+            "total"
+          ]
+        },
+        {
+          "component": "low_stock_list",
+          "limit": 6,
+          "fields": [
+            "product_image",
+            "product_name",
+            "available",
+            "threshold",
+            "quick_add_stock"
+          ]
+        }
+      ],
+      "acceptance_criteria": [
+        "A seller can identify urgent work in under 10 seconds.",
+        "All quick actions are visible without scrolling on desktop.",
+        "Mobile layout has no dense tables.",
+        "Store live status is obvious."
+      ]
+    },
+    {
+      "id": "orders_board",
+      "name": "Orders Board",
+      "route": "/dashboard/orders",
+      "goal": "Let staff process website and WhatsApp orders quickly.",
+      "layout": {
+        "desktop": "Kanban columns with sticky filters.",
+        "mobile": "Segmented status tabs with order cards."
+      },
+      "sections": [
+        {
+          "component": "filters",
+          "fields": [
+            "search_by_order_customer_phone",
+            "source_filter",
+            "payment_filter",
+            "fulfillment_filter",
+            "date_filter"
+          ]
+        },
+        {
+          "component": "status_columns_or_tabs",
+          "statuses": [
+            "new",
+            "confirmed",
+            "preparing",
+            "ready_for_pickup",
+            "out_for_delivery",
+            "completed",
+            "cancelled"
+          ]
+        },
+        {
+          "component": "order_card",
+          "fields": [
+            "order_number",
+            "customer_name",
+            "source_badge",
+            "fulfillment_badge",
+            "payment_badge",
+            "item_count",
+            "total",
+            "placed_at",
+            "next_action"
+          ],
+          "actions": [
+            "Accept",
+            "Start preparing",
+            "Ready",
+            "Out for delivery",
+            "Complete",
+            "Cancel"
+          ]
+        },
+        {
+          "component": "order_detail_drawer",
+          "fields": [
+            "customer_details",
+            "items",
+            "substitution_controls",
+            "payment_status",
+            "fulfillment_method",
+            "notes",
+            "timeline",
+            "internal_notes"
+          ],
+          "actions": [
+            "Print packing list",
+            "Change status",
+            "Contact customer",
+            "Cancel order"
+          ]
+        }
+      ],
+      "acceptance_criteria": [
+        "New order can be accepted in one click.",
+        "Order detail drawer is usable on mobile.",
+        "Payment status and order status are visually separate.",
+        "WhatsApp vs website orders are clearly labeled."
+      ]
+    },
+    {
+      "id": "products_catalog",
+      "name": "Products",
+      "route": "/dashboard/products",
+      "goal": "Manage the products visible on storefront and WhatsApp.",
+      "layout": {
+        "desktop": "Table/list with filters and right-side editor drawer.",
+        "mobile": "Search + filter chips + product cards."
+      },
+      "sections": [
+        {
+          "component": "toolbar",
+          "actions": [
+            "Add product",
+            "Import CSV",
+            "Bulk edit",
+            "Export CSV"
+          ]
+        },
+        {
+          "component": "filters",
+          "fields": [
+            "search",
+            "category",
+            "stock_status",
+            "listed_status",
+            "active_status"
+          ]
+        },
+        {
+          "component": "product_list",
+          "fields": [
+            "image",
+            "name",
+            "category",
+            "price",
+            "unit",
+            "available_stock",
+            "listed",
+            "actions"
+          ]
+        },
+        {
+          "component": "product_editor",
+          "mode": "drawer",
+          "fields": [
+            "name",
+            "description",
+            "category",
+            "image",
+            "price",
+            "compare_at_price",
+            "unit",
+            "sku",
+            "barcode",
+            "stock",
+            "low_stock_threshold",
+            "is_active",
+            "is_listed",
+            "variants"
+          ]
+        }
+      ],
+      "acceptance_criteria": [
+        "Product can be added in under 45 seconds.",
+        "Stock can be adjusted without opening a complicated form.",
+        "Product listing status is obvious.",
+        "Image upload or image URL works."
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "route": "/dashboard/inventory",
+      "goal": "Track stock, prevent overselling, and show low-stock products.",
+      "sections": [
+        {
+          "component": "inventory_summary",
+          "cards": [
+            "total_products",
+            "low_stock_items",
+            "out_of_stock_items",
+            "reserved_items"
+          ]
+        },
+        {
+          "component": "inventory_tabs",
+          "tabs": [
+            "All stock",
+            "Low stock",
+            "Out of stock",
+            "Movements",
+            "Import/export"
+          ]
+        },
+        {
+          "component": "stock_table",
+          "fields": [
+            "product",
+            "on_hand",
+            "reserved",
+            "available",
+            "threshold",
+            "status",
+            "actions"
+          ]
+        },
+        {
+          "component": "adjust_stock_modal",
+          "fields": [
+            "product",
+            "current_stock",
+            "action_type",
+            "quantity",
+            "reason"
+          ],
+          "action_types": [
+            "Add stock",
+            "Reduce stock",
+            "Set exact stock",
+            "Mark damaged/expired"
+          ]
+        },
+        {
+          "component": "movement_history",
+          "fields": [
+            "created_at",
+            "product",
+            "movement_type",
+            "quantity_change",
+            "reason",
+            "source",
+            "created_by"
+          ]
+        }
+      ],
+      "inventory_rules": {
+        "available_formula": "available = on_hand - reserved",
+        "order_placed": "Increase reserved only.",
+        "order_completed": "Decrease on_hand and reserved.",
+        "order_cancelled": "Decrease reserved and release reservation.",
+        "manual_adjustment": "Create inventory movement."
+      },
+      "acceptance_criteria": [
+        "Every stock change creates an inventory movement.",
+        "Low-stock products are clearly visible.",
+        "Order lifecycle updates stock correctly.",
+        "No overselling when available stock is 0."
+      ]
+    },
+    {
+      "id": "public_storefront",
+      "name": "Public Storefront",
+      "route": "/store/:storeSlug",
+      "goal": "Let customers order from a clean online store without downloading an app.",
+      "layout": {
+        "desktop": "Store header + categories sidebar/top chips + product grid + cart drawer.",
+        "mobile": "Sticky header + search + category chips + product cards + bottom cart bar."
+      },
+      "sections": [
+        {
+          "component": "store_header",
+          "fields": [
+            "logo",
+            "store_name",
+            "open_status",
+            "address_short",
+            "search",
+            "cart"
+          ]
+        },
+        {
+          "component": "store_hero",
+          "fields": [
+            "banner",
+            "pickup_delivery_info",
+            "minimum_order",
+            "delivery_fee",
+            "today_status"
+          ]
+        },
+        {
+          "component": "category_chips",
+          "behavior": "horizontal_scroll_mobile"
+        },
+        {
+          "component": "product_grid",
+          "product_card_fields": [
+            "image",
+            "name",
+            "variant",
+            "price",
+            "stock_label",
+            "add_button"
+          ]
+        },
+        {
+          "component": "cart_drawer",
+          "fields": [
+            "items",
+            "quantity_controls",
+            "subtotal",
+            "delivery_fee",
+            "total",
+            "fulfillment_type",
+            "checkout_button"
+          ]
+        },
+        {
+          "component": "checkout_form",
+          "fields": [
+            "name",
+            "phone",
+            "email_optional",
+            "fulfillment_type",
+            "delivery_address",
+            "notes",
+            "payment_method"
+          ]
+        },
+        {
+          "component": "confirmation_page",
+          "fields": [
+            "order_number",
+            "items",
+            "total",
+            "status",
+            "pickup_delivery_instructions",
+            "contact_store"
+          ]
+        }
+      ],
+      "stock_labels": [
+        "In stock",
+        "Only {n} left",
+        "Out of stock",
+        "Pre-order",
+        "Available tomorrow"
+      ],
+      "acceptance_criteria": [
+        "Customer can place order in under 90 seconds.",
+        "Out-of-stock products cannot be ordered unless backorder is enabled.",
+        "Storefront is excellent on mobile.",
+        "Cart and checkout are clear and simple."
+      ]
+    },
+    {
+      "id": "website_setup",
+      "name": "Website Setup",
+      "route": "/dashboard/website",
+      "goal": "Help stores make their existing website orderable.",
+      "sections": [
+        {
+          "component": "storefront_preview_card",
+          "actions": [
+            "Open live store",
+            "Copy store link"
+          ]
+        },
+        {
+          "component": "order_button_snippet",
+          "fields": [
+            "html_snippet",
+            "copy_button",
+            "preview_button"
+          ],
+          "default_snippet": "<a href='https://porter.app/store/{storeSlug}' target='_blank'>Order Online</a>"
+        },
+        {
+          "component": "qr_code_card",
+          "actions": [
+            "Download QR",
+            "Print poster"
+          ]
+        },
+        {
+          "component": "embed_widget_card",
+          "status": "future",
+          "modes": [
+            "button",
+            "featured",
+            "catalog",
+            "search",
+            "cart",
+            "offers"
+          ]
+        },
+        {
+          "component": "custom_domain_card",
+          "status": "future",
+          "examples": [
+            "order.store.com",
+            "shop.store.com"
+          ]
+        }
+      ],
+      "copy": {
+        "main": "Your website does not need to be rebuilt. Add this Order Online button and Porter handles catalog, cart, checkout, and orders."
+      },
+      "acceptance_criteria": [
+        "Seller can copy website button in one click.",
+        "QR code is downloadable.",
+        "Storefront preview opens quickly.",
+        "The page explains that Porter complements the existing website."
+      ]
+    },
+    {
+      "id": "whatsapp_setup",
+      "name": "WhatsApp Setup",
+      "route": "/dashboard/whatsapp",
+      "goal": "Configure and test WhatsApp ordering.",
+      "sections": [
+        {
+          "component": "connection_status",
+          "fields": [
+            "status",
+            "connected_number",
+            "last_webhook_event",
+            "test_status"
+          ]
+        },
+        {
+          "component": "test_message",
+          "actions": [
+            "Send test order",
+            "Reset test conversation"
+          ]
+        },
+        {
+          "component": "bot_settings",
+          "fields": [
+            "greeting_message",
+            "languages",
+            "product_matching_sensitivity",
+            "off_hours_message"
+          ]
+        },
+        {
+          "component": "abandoned_order_nudge",
+          "fields": [
+            "enabled",
+            "delay_minutes",
+            "message_template"
+          ]
+        }
+      ],
+      "acceptance_criteria": [
+        "Seller understands whether WhatsApp is live.",
+        "Test flow can be completed safely.",
+        "Bot settings are non-technical."
+      ]
+    },
+    {
+      "id": "analytics",
+      "name": "Analytics",
+      "route": "/dashboard/analytics",
+      "goal": "Show store owner how Porter helps sales and operations.",
+      "sections": [
+        {
+          "component": "kpi_cards",
+          "cards": [
+            "orders",
+            "revenue",
+            "average_order_value",
+            "repeat_customers"
+          ]
+        },
+        {
+          "component": "sales_chart",
+          "time_ranges": [
+            "7d",
+            "30d",
+            "90d"
+          ]
+        },
+        {
+          "component": "top_products",
+          "fields": [
+            "product",
+            "quantity_sold",
+            "revenue"
+          ]
+        },
+        {
+          "component": "low_stock_impact",
+          "fields": [
+            "low_stock_items",
+            "out_of_stock_items",
+            "missed_or_blocked_items_future"
+          ]
+        },
+        {
+          "component": "abandoned_recovery",
+          "fields": [
+            "nudges_sent",
+            "orders_recovered",
+            "estimated_value"
+          ]
+        }
+      ],
+      "acceptance_criteria": [
+        "Seller can see simple business impact.",
+        "No vanity metrics only.",
+        "Top products and low stock are actionable."
+      ]
+    },
+    {
+      "id": "admin_sellers",
+      "name": "Admin Sellers",
+      "route": "/admin/sellers",
+      "goal": "Let Porter team onboard and support stores.",
+      "sections": [
+        {
+          "component": "seller_table",
+          "fields": [
+            "store_name",
+            "owner",
+            "plan",
+            "setup_status",
+            "orders_month",
+            "whatsapp_status",
+            "website_status",
+            "last_active"
+          ]
+        },
+        {
+          "component": "seller_detail",
+          "tabs": [
+            "Overview",
+            "Setup",
+            "Orders",
+            "Products",
+            "Billing",
+            "Support notes"
+          ]
+        },
+        {
+          "component": "setup_health",
+          "checks": [
+            "profile",
+            "products",
+            "inventory",
+            "storefront",
+            "website_button",
+            "whatsapp",
+            "payments"
+          ]
+        }
+      ],
+      "acceptance_criteria": [
+        "Admin can see which stores are not fully launched.",
+        "Admin can support client onboarding quickly.",
+        "Impersonation/support access is controlled."
+      ]
+    }
+  ],
+  "components": {
+    "status_badges": {
+      "order_status": {
+        "pending": {
+          "label": "New",
+          "color": "warning"
+        },
+        "confirmed": {
+          "label": "Confirmed",
+          "color": "info"
+        },
+        "preparing": {
+          "label": "Preparing",
+          "color": "accent"
+        },
+        "ready_for_pickup": {
+          "label": "Ready",
+          "color": "primary"
+        },
+        "out_for_delivery": {
+          "label": "Out for delivery",
+          "color": "info"
+        },
+        "completed": {
+          "label": "Completed",
+          "color": "primary"
+        },
+        "cancelled": {
+          "label": "Cancelled",
+          "color": "danger"
+        }
+      },
+      "payment_status": {
+        "unpaid": {
+          "label": "Unpaid",
+          "color": "warning"
+        },
+        "paid": {
+          "label": "Paid",
+          "color": "primary"
+        },
+        "cod": {
+          "label": "COD",
+          "color": "muted"
+        },
+        "manual_pending": {
+          "label": "Manual pending",
+          "color": "warning"
+        },
+        "failed": {
+          "label": "Failed",
+          "color": "danger"
+        }
+      },
+      "stock_status": {
+        "in_stock": {
+          "label": "In stock",
+          "color": "primary"
+        },
+        "low_stock": {
+          "label": "Low stock",
+          "color": "warning"
+        },
+        "out_of_stock": {
+          "label": "Out of stock",
+          "color": "danger"
+        },
+        "backorder": {
+          "label": "Pre-order",
+          "color": "info"
+        }
+      }
+    },
+    "buttons": {
+      "primary": {
+        "height": 44,
+        "radius": 999,
+        "background": "#0F7A3A",
+        "color": "#FFFFFF"
+      },
+      "secondary": {
+        "height": 44,
+        "radius": 999,
+        "background": "#FFFFFF",
+        "border": "#EADFCE",
+        "color": "#111827"
+      },
+      "accent": {
+        "height": 44,
+        "radius": 999,
+        "background": "#F26B00",
+        "color": "#FFFFFF"
+      }
+    },
+    "empty_states": {
+      "no_products": {
+        "title": "Add your first products",
+        "body": "Create products to publish your online store and start taking orders.",
+        "actions": [
+          "Add product",
+          "Import CSV",
+          "Use starter catalog"
+        ]
+      },
+      "no_orders": {
+        "title": "No orders yet",
+        "body": "Once customers order from your website or WhatsApp, orders will appear here.",
+        "actions": [
+          "View live store",
+          "Copy order link"
+        ]
+      },
+      "no_low_stock": {
+        "title": "Stock looks healthy",
+        "body": "Products below their low-stock threshold will appear here.",
+        "actions": [
+          "Review inventory"
+        ]
+      }
+    }
+  },
+  "data_model": {
+    "tables": [
+      "stores",
+      "categories",
+      "products",
+      "product_variants",
+      "inventory_locations",
+      "inventory_balances",
+      "inventory_movements",
+      "orders",
+      "order_items",
+      "stock_reservations",
+      "customers",
+      "payment_events",
+      "website_widgets",
+      "whatsapp_conversations"
+    ],
+    "inventory_logic": {
+      "available": "on_hand - reserved",
+      "order_placed": "create stock_reservation and increase reserved",
+      "order_completed": "decrease on_hand and reserved; mark reservation fulfilled",
+      "order_cancelled": "decrease reserved; mark reservation released",
+      "manual_stock_change": "create inventory_movement"
+    }
+  },
+  "implementation_sequence": [
+    "Audit existing schema and screens",
+    "Add inventory balances and movements",
+    "Create inventory service functions",
+    "Build stock adjustment modal",
+    "Build product import CSV",
+    "Build public storefront",
+    "Build cart and checkout",
+    "Connect website orders to dashboard",
+    "Implement reservation logic",
+    "Update stock through order lifecycle",
+    "Build website setup page",
+    "Add QR generation",
+    "Polish seller dashboard home",
+    "Build analytics MVP",
+    "Add onboarding checklist",
+    "Add plan gates",
+    "Build embed widget",
+    "Add custom domains",
+    "Add WooCommerce/Shopify sync later"
+  ],
+  "qa_checklist": {
+    "functional": [
+      "Store can be created",
+      "Products can be added",
+      "CSV import works",
+      "Inventory movement is created for stock changes",
+      "Storefront displays live products",
+      "Customer can place website order",
+      "WhatsApp order appears in dashboard",
+      "Payment status is separate from order status",
+      "Stock reserves on order",
+      "Stock releases on cancellation",
+      "Stock deducts on completion",
+      "Low-stock alert appears",
+      "Website button snippet works",
+      "Dashboard works on phone"
+    ],
+    "visual": [
+      "Consistent spacing",
+      "Consistent border radius",
+      "Cards have soft shadows",
+      "Mobile screens avoid dense tables",
+      "Touch targets at least 44px",
+      "Primary actions are clear",
+      "Empty states teach the user"
+    ],
+    "technical": [
+      "RLS tested",
+      "Webhook signatures verified",
+      "No secrets exposed to frontend",
+      "All seller queries scoped by store_id",
+      "Inventory update is transactional",
+      "Order creation is atomic",
+      "CSV import validates rows",
+      "Webhook failures are logged"
+    ]
+  }
+}
