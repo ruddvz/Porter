@@ -1,5 +1,6 @@
 import LiveOrdersBoard from "./ui";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { buildSetupChecklist, filterLowStockProducts } from "@/lib/setup-checklist";
 import { redirect } from "next/navigation";
 
 export default async function DashboardHome() {
@@ -19,17 +20,34 @@ export default async function DashboardHome() {
     .order("created_at", { ascending: false })
     .limit(200);
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
+  const { data: products } = await supabase.from("products").select("*").eq("seller_id", seller.id);
+
+  const { count: orderCount } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
     .eq("seller_id", seller.id);
 
-  const lowStock =
-    (products ?? []).filter((p) => {
-      const sq = p.stock_quantity ?? (p.in_stock ? 1 : 0);
-      const listed = p.is_active !== false && p.in_stock && sq > 0;
-      return listed && sq <= 5;
-    }) ?? [];
+  const whatsappConnected =
+    seller.whatsapp_provider === "openwa"
+      ? Boolean(seller.openwa_session_id && seller.openwa_session_status === "CONNECTED")
+      : Boolean(seller.meta_phone_number_id);
 
-  return <LiveOrdersBoard seller={seller} initialOrders={orders ?? []} lowStockProducts={lowStock} />;
+  const setupChecklist = buildSetupChecklist({
+    seller,
+    productCount: products?.length ?? 0,
+    orderCount: orderCount ?? 0,
+    hasZones: (seller.delivery_zones?.length ?? 0) > 0,
+    whatsappConnected,
+  });
+
+  const lowStock = filterLowStockProducts(products ?? []);
+
+  return (
+    <LiveOrdersBoard
+      seller={seller}
+      initialOrders={orders ?? []}
+      lowStockProducts={lowStock}
+      setupChecklist={setupChecklist}
+    />
+  );
 }

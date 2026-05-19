@@ -34,6 +34,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/cn";
+import InventoryLedgerPanel from "@/components/inventory/InventoryLedgerPanel";
 
 const PRESET_CATEGORIES = ["Vegetables", "Dairy", "Staples", "Beverages", "Snacks", "Household", "Other"];
 const UNITS = ["kg", "litre", "pkt", "piece", "dozen", "box"] as const;
@@ -482,6 +483,14 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
       )}
 
       {sortedFiltered.length === 0 && <EmptyState title="No products match" description="Try a different search or category." />}
+
+      <InventoryLedgerPanel
+        products={products}
+        onStockChanged={async () => {
+          const { data } = await supabase.from("products").select("*").eq("seller_id", seller.id);
+          if (data) setProducts(data);
+        }}
+      />
 
       {editMode && selectedCount > 0 && (
         <div className="fixed bottom-4 left-3 right-3 z-40 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-porter-bg-border bg-porter-bg-raised p-3 shadow-modal md:left-auto md:right-6 md:min-w-[420px]">
