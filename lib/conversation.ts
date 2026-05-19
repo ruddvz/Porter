@@ -38,6 +38,7 @@ import {
 import { isSellerWithinWorkingHours } from "@/lib/working-hours";
 import { parseReferralHint } from "@/lib/referral";
 import { parseScheduledDeliveryHint } from "@/lib/scheduled-delivery";
+import { reserveStockForOrder } from "@/lib/inventory";
 
 function geminiLangOpts(seller: Seller) {
   return { botLanguage: normalizeBotLanguagePref(seller.bot_language) as BotLanguagePreference };
@@ -661,28 +662,6 @@ async function handleSameAsLastTime(
   return true;
 }
 
-async function adjustProductStockAfterOrder(
-  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
-  items: ParsedLineItem[]
-) {
-  for (const it of items) {
-    if (!it.product_id) continue;
-    const { data: row } = await supabase.from("products").select("stock_quantity, in_stock").eq("id", it.product_id).maybeSingle();
-    if (!row) continue;
-    const prev = (row as { stock_quantity?: number; in_stock: boolean }).stock_quantity;
-    const sq = typeof prev === "number" ? prev : row.in_stock ? 1 : 0;
-    const next = Math.max(0, sq - it.quantity);
-    await supabase
-      .from("products")
-      .update({
-        stock_quantity: next,
-        in_stock: next > 0,
-        is_active: next > 0,
-      })
-      .eq("id", it.product_id);
-  }
-}
-
 function trackOrderAppend(order: Order): string {
   const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   const slug = (order as { track_public_slug?: string | null }).track_public_slug;
@@ -805,6 +784,7 @@ async function finalizeOrderFromContext(
     status: orderStatus,
     payment_method: paymentMethod,
     payment_status: paymentStatus,
+    order_source: "whatsapp",
   };
   if (ctx.notes) insertPayload.notes = ctx.notes;
   if (ctx.scheduled_for) insertPayload.scheduled_for = ctx.scheduled_for;
@@ -837,7 +817,23 @@ async function finalizeOrderFromContext(
     total_price: i.total_price,
   }));
   await supabase.from("order_items").insert(orderItems);
-  await adjustProductStockAfterOrder(supabase, items);
+
+  const reserveItems = items
+    .filter((i) => i.product_id)
+    .map((i) => ({ productId: i.product_id as string, quantity: i.quantity }));
+  if (reserveItems.length) {
+    const reserved = await reserveStockForOrder({
+      sellerId: seller.id,
+      orderId: order.id,
+      items: reserveItems,
+    });
+    if (!reserved.ok) {
+      await supabase.from("order_items").delete().eq("order_id", order.id);
+      await supabase.from("orders").delete().eq("id", order.id);
+      await sendMessage(phone, t("order_save_failed", lang) + " (stock)", seller);
+      return;
+    }
+  }
 
   if (customerId) {
     const { data: c } = await supabase.from("customers").select("order_count").eq("id", customerId).single();

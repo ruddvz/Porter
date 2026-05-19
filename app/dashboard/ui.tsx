@@ -1,6 +1,8 @@
 "use client";
 
 import DashboardHomeInsights from "@/components/dashboard/DashboardHomeInsights";
+import SetupChecklistCard from "@/components/dashboard/SetupChecklistCard";
+import type { SetupCheckItem } from "@/lib/setup-checklist";
 import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -236,10 +238,12 @@ export default function LiveOrdersBoard({
   seller,
   initialOrders,
   lowStockProducts,
+  setupChecklist,
 }: {
   seller: Seller;
   initialOrders: OrderWithItems[];
   lowStockProducts: Product[];
+  setupChecklist: SetupCheckItem[];
 }) {
   const { push: toast } = useToast();
   const nowMs = useSharedNow();
@@ -390,6 +394,17 @@ export default function LiveOrdersBoard({
         toast(error.message, "error");
         return;
       }
+      if (updates.status && updates.status !== prev.status) {
+        try {
+          await fetch(`/api/seller/orders/${order.id}/inventory-sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ previousStatus: prev.status, newStatus: updates.status }),
+          });
+        } catch {
+          /* non-blocking */
+        }
+      }
       if (
         updates.payment_status === "paid" &&
         prev.payment_status !== "paid" &&
@@ -439,7 +454,9 @@ export default function LiveOrdersBoard({
   return (
     <>
       <div className="px-3 py-4 md:px-6 md:py-6">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SetupChecklistCard items={setupChecklist} />
+
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Today's orders" value={stats.total} />
           <StatCard label="Today's revenue" value={Math.round(stats.revenue).toLocaleString("en-IN")} prefix="₹" />
           <StatCard

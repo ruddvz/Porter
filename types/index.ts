@@ -81,6 +81,8 @@ export interface Seller {
   openwa_session_status?: string | null;
   pickup_enabled?: boolean | null;
   delivery_enabled?: boolean | null;
+  /** When true, Razorpay payment webhook commits inventory sale immediately. */
+  auto_commit_inventory_on_payment?: boolean | null;
 }
 
 export interface Product {
@@ -98,7 +100,22 @@ export interface Product {
   stock_quantity?: number;
   /** Lower values appear first when using custom sort / drag reorder (Plan0 §5). */
   sort_order?: number;
+  category_id?: string | null;
+  product_slug?: string | null;
+  low_stock_threshold?: number;
   created_at: string;
+}
+
+export interface Category {
+  id: string;
+  seller_id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  image_url?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface Customer {

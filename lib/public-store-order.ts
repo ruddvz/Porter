@@ -20,7 +20,8 @@ export type StorefrontOrderInput = {
 
 export async function createStorefrontOrder(
   sellerId: string,
-  input: StorefrontOrderInput
+  input: StorefrontOrderInput,
+  orderSource: "storefront" | "widget" = "storefront"
 ): Promise<{ ok: true; orderId: string; trackSlug: string | null } | { ok: false; error: string }> {
   const supabase = createSupabaseServiceRoleClient();
 
@@ -94,7 +95,7 @@ export async function createStorefrontOrder(
       status: orderStatus,
       payment_method: input.paymentMethod,
       payment_status: paymentStatus,
-      order_source: "storefront",
+      order_source: orderSource,
       fulfillment_type: input.fulfillmentType,
       notes: input.notes ?? null,
     })

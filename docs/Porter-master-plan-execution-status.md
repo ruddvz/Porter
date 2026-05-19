@@ -1,32 +1,28 @@
 # Porter Master Plan — Execution Status
 
-**Canonical plan:** [PORTER_IMPLEMENTATION_MASTER_PLAN.md](./PORTER_IMPLEMENTATION_MASTER_PLAN.md) (from `porter_implementation_package.zip` on `main`).
+**Canonical plan:** [PORTER_IMPLEMENTATION_MASTER_PLAN.md](./PORTER_IMPLEMENTATION_MASTER_PLAN.md)
 
-Branch: `cursor/openwa-inventory-storefront-1fd5`
-
-## Done in this branch
+## Branch: `cursor/follow-ups-categories-widget-1fd5` (follow-ups PR)
 
 | Item | Status |
 |------|--------|
-| Official zip extracted to `docs/` | ✅ |
-| `store_slug`, OpenWA columns, inventory ledger | ✅ migration `015` |
-| Unified `lib/whatsapp.ts` (Meta + OpenWA) | ✅ |
-| OpenWA client + webhook + seller connect API | ✅ |
-| Public storefront `/store/[slug]` | ✅ |
-| Public APIs `GET/POST /api/public/stores/:slug/*` | ✅ |
-| Website snippet API | ✅ `/api/seller/website/snippet` |
-| Stock reservations on storefront checkout | ✅ `lib/public-store-order.ts` |
-| Settings: Website + WhatsApp (OpenWA QR) tabs | ✅ |
-| `docker-compose.openwa.yml` + env docs | ✅ |
+| Categories CRUD dashboard (`/dashboard/categories`) + product `category_id` in modal | ✅ |
+| Order detail panel → status buttons + inventory sync on cancel/delivered | ✅ |
+| Widget `cart` mode with inline checkout (`orderSource: widget`) | ✅ |
+| Razorpay paid webhook → optional `auto_commit_inventory_on_payment` (migration `017`) | ✅ |
 
-## Existing on `main` before this branch
+## Branch: `cursor/phase2-ledger-widget-dashboard-1fd5` (PR #19)
 
-- Meta WhatsApp bot, seller dashboard, Razorpay, track page, PWA
+| Item | Status |
+|------|--------|
+| WhatsApp bot uses `reserveStockForOrder` (not direct stock decrement) | ✅ |
+| Order cancel/deliver → inventory sync API | ✅ |
+| Embeddable `public/widget.js` + `/api/widget/:slug/*` (CORS) | ✅ |
+| Dashboard setup checklist card | ✅ |
+| Low-stock uses `low_stock_threshold` | ✅ |
+| Migration `016` categories + product_slug | ✅ |
+| Inventory ledger UI + adjust/movements APIs | ✅ |
 
-## Next
+## Branch: `cursor/openwa-inventory-storefront-1fd5` (PR #18)
 
-- Wire WhatsApp bot orders through `reserveStockForOrder` (storefront already does)
-- Dashboard home: setup checklist, copy website button (per blueprint)
-- `public/widget.js` embed (Phase 4)
-- Categories table + product slugs (per zip schema §7)
-- Apply migration `015` in Supabase
+OpenWA, public storefront, migration `015`, website snippet.
