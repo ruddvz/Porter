@@ -62,6 +62,7 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
   const [upi, setUpi] = useState(seller.upi_id ?? "");
   const [codEnabled, setCodEnabled] = useState(seller.cod_enabled);
   const [testMode, setTestMode] = useState(!!seller.razorpay_test_mode);
+  const [autoCommitInventory, setAutoCommitInventory] = useState(!!seller.auto_commit_inventory_on_payment);
 
   const [botIntro, setBotIntro] = useState(
     seller.plan === "growth" ? seller.bot_intro_message?.trim() || defaultIntro(seller.store_name) : defaultIntro(seller.store_name)
@@ -149,6 +150,7 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
     const payload: Record<string, unknown> = {
       cod_enabled: codEnabled,
       razorpay_test_mode: testMode,
+      auto_commit_inventory_on_payment: autoCommitInventory,
     };
     if (rzpId.trim()) payload.razorpay_key_id = rzpId.trim();
     if (rzpSecret.trim()) payload.razorpay_key_secret = rzpSecret.trim();
@@ -467,6 +469,20 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
             <span className="text-sm font-semibold text-porter-text-secondary">Razorpay test mode</span>
             <input type="checkbox" checked={testMode} onChange={(e) => setTestMode(e.target.checked)} className="h-6 w-11 accent-porter-green-500" />
           </label>
+          <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-lg border border-porter-bg-border bg-porter-bg-raised px-3 py-2">
+            <span className="max-w-[70%] text-sm font-semibold text-porter-text-secondary">
+              Auto-commit inventory when Razorpay marks paid
+            </span>
+            <input
+              type="checkbox"
+              checked={autoCommitInventory}
+              onChange={(e) => setAutoCommitInventory(e.target.checked)}
+              className="h-6 w-11 accent-porter-green-500"
+            />
+          </label>
+          <p className="text-xs text-porter-text-muted">
+            When enabled, stock reservations are committed to sale as soon as payment clears (otherwise commit on delivered).
+          </p>
           <p className="text-xs text-porter-text-muted">
             Set PORTER_CREDENTIAL_SECRET on the server, then save — UPI and Razorpay keys can be encrypted at rest (plaintext columns cleared).
           </p>

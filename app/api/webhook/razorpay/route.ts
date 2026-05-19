@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { waitUntil } from "@vercel/functions";
 import { insertOrderEvent } from "@/lib/order-events";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
+import { maybeCommitInventoryAfterPayment } from "@/lib/razorpay-inventory";
 import { sendMessage } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -81,6 +82,7 @@ async function markOrderPaidFromLink(supabase: ReturnType<typeof createSupabaseS
   const phone = normalizePhone(order.customer_phone as string);
   await sendMessage(phone, "✅ Payment received! Your order is being packed. ~30 mins. 🛵", seller);
   void notifyOrderPush(order.seller_id as string, "Payment received", `₹${order.total_amount} — order ${String(order.id).slice(0, 8)}`);
+  await maybeCommitInventoryAfterPayment(order.id as string, seller);
 }
 
 async function findOrderForPayment(
@@ -144,6 +146,7 @@ async function handlePaymentCaptured(payload: { payment?: { entity?: Record<stri
     seller
   );
   void notifyOrderPush(order.seller_id as string, "Payment received", `₹${order.total_amount}`);
+  await maybeCommitInventoryAfterPayment(order.id as string, seller);
 }
 
 async function handlePaymentFailed(payload: { payment?: { entity?: Record<string, unknown> } }) {

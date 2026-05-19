@@ -81,6 +81,8 @@ export interface Seller {
   openwa_session_status?: string | null;
   pickup_enabled?: boolean | null;
   delivery_enabled?: boolean | null;
+  /** When true, Razorpay payment webhook commits inventory sale immediately. */
+  auto_commit_inventory_on_payment?: boolean | null;
 }
 
 export interface Product {

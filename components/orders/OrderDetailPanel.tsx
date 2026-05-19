@@ -9,7 +9,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Drawer } from "@/components/ui/Drawer";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
-import type { Order, Seller } from "@/types";
+import { syncOrderInventory } from "@/lib/sync-order-inventory-client";
+import type { Order, OrderStatus, Seller } from "@/types";
 import { Copy, MapPin, MessageCircle, Printer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -161,6 +162,27 @@ export default function OrderDetailPanel({
     }
   }, [note, o, supabase, toast, onSaved]);
 
+  const setOrderStatus = useCallback(
+    async (newStatus: OrderStatus, extra?: Partial<Order>) => {
+      if (!o) return;
+      const prev = { ...o };
+      const updates = { status: newStatus, ...extra };
+      onOrderUpdate?.({ ...o, ...updates });
+      setBusy(true);
+      const { error } = await supabase.from("orders").update(updates).eq("id", o.id);
+      setBusy(false);
+      if (error) {
+        onOrderUpdate?.(prev);
+        toast(error.message, "error");
+        return;
+      }
+      await syncOrderInventory(o.id, prev.status, newStatus);
+      toast("Status updated", "success");
+      onSaved();
+    },
+    [o, onOrderUpdate, onSaved, supabase, toast],
+  );
+
   const cancelOrder = useCallback(async () => {
     if (!o) return;
     if (o.status !== "pending" && o.status !== "confirmed" && o.status !== "preparing" && o.status !== "paid") return;
@@ -173,6 +195,7 @@ export default function OrderDetailPanel({
       toast(error.message, "error");
       throw new Error(error.message);
     }
+    await syncOrderInventory(o.id, prev.status, "cancelled");
     toast("Order cancelled", "success");
     onSaved();
     onClose();
@@ -235,6 +258,11 @@ export default function OrderDetailPanel({
     o.status === "preparing" ||
     o.status === "paid";
 
+  const canMarkPreparing = o.status === "pending" || o.status === "confirmed" || o.status === "paid";
+  const canMarkOutForDelivery = o.status === "preparing" || o.status === "paid";
+  const canMarkDelivered =
+    o.status === "preparing" || o.status === "paid" || o.status === "out_for_delivery";
+
   return (
     <>
       <Drawer
@@ -244,6 +272,33 @@ export default function OrderDetailPanel({
         className="sm:max-w-[400px]"
         footer={
           <div className="flex w-full flex-wrap justify-end gap-2">
+            {canMarkPreparing && (
+              <Button type="button" variant="secondary" size="sm" loading={busy} onClick={() => void setOrderStatus("preparing")}>
+                Start preparing
+              </Button>
+            )}
+            {canMarkOutForDelivery && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                loading={busy}
+                onClick={() => void setOrderStatus("out_for_delivery")}
+              >
+                Out for delivery
+              </Button>
+            )}
+            {canMarkDelivered && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                loading={busy}
+                onClick={() => void setOrderStatus("delivered", { delivered_at: new Date().toISOString() })}
+              >
+                Mark delivered
+              </Button>
+            )}
             {o.payment_method === "cod" && o.payment_status === "cod_pending" && (
               <Button
                 type="button"

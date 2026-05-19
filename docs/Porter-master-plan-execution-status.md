@@ -2,7 +2,16 @@
 
 **Canonical plan:** [PORTER_IMPLEMENTATION_MASTER_PLAN.md](./PORTER_IMPLEMENTATION_MASTER_PLAN.md)
 
-## Branch: `cursor/phase2-ledger-widget-dashboard-1fd5` (this PR)
+## Branch: `cursor/follow-ups-categories-widget-1fd5` (follow-ups PR)
+
+| Item | Status |
+|------|--------|
+| Categories CRUD dashboard (`/dashboard/categories`) + product `category_id` in modal | ✅ |
+| Order detail panel → status buttons + inventory sync on cancel/delivered | ✅ |
+| Widget `cart` mode with inline checkout (`orderSource: widget`) | ✅ |
+| Razorpay paid webhook → optional `auto_commit_inventory_on_payment` (migration `017`) | ✅ |
+
+## Branch: `cursor/phase2-ledger-widget-dashboard-1fd5` (PR #19)
 
 | Item | Status |
 |------|--------|
@@ -17,10 +26,3 @@
 ## Branch: `cursor/openwa-inventory-storefront-1fd5` (PR #18)
 
 OpenWA, public storefront, migration `015`, website snippet.
-
-## Next
-
-- Order detail panel status changes → inventory sync
-- Category management UI (CRUD on `categories` table)
-- Widget `cart` mode + checkout iframe
-- Commit sale on Razorpay webhook when order marked paid+delivered

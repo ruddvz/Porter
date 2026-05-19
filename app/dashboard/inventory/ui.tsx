@@ -1,7 +1,7 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import type { Product, Seller } from "@/types";
+import type { Category, Product, Seller } from "@/types";
 import { filterProductsByFuzzySearch } from "@/lib/fuzzy";
 import { isProductListedForBot, productListingHint } from "@/lib/product-catalog";
 import { checkGate } from "@/lib/plan-gates";
@@ -15,7 +15,8 @@ import { Drawer } from "@/components/ui/Drawer";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { Pencil, Trash2, GripVertical } from "lucide-react";
-import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -38,8 +39,6 @@ import InventoryLedgerPanel from "@/components/inventory/InventoryLedgerPanel";
 
 const PRESET_CATEGORIES = ["Vegetables", "Dairy", "Staples", "Beverages", "Snacks", "Household", "Other"];
 const UNITS = ["kg", "litre", "pkt", "piece", "dozen", "box"] as const;
-
-const PRESET_SET = new Set(PRESET_CATEGORIES.map((c) => c.toLowerCase()));
 
 function stockLevelLabel(p: Product): string | null {
   const sq = p.stock_quantity ?? (p.in_stock ? 1 : 0);
@@ -660,19 +659,23 @@ function ProductModal({
   const [imageUrl, setImageUrl] = useState(product?.image_url ?? "");
   const [aliasInput, setAliasInput] = useState("");
   const [aliasChips, setAliasChips] = useState<string[]>(product?.aliases ?? []);
-  const [categoryMode, setCategoryMode] = useState<"preset" | "custom">(() => {
-    const c = product?.category ?? "";
-    if (!c) return "preset";
-    return PRESET_SET.has(c.toLowerCase()) ? "preset" : "custom";
-  });
-  const [categoryPreset, setCategoryPreset] = useState(() => {
-    const c = product?.category ?? "Other";
-    return PRESET_SET.has(c.toLowerCase()) ? c : "Other";
-  });
-  const [categoryCustom, setCategoryCustom] = useState(() => {
-    const c = product?.category ?? "";
-    return PRESET_SET.has(c.toLowerCase()) ? "" : c;
-  });
+  const [dbCategories, setDbCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState<string>(() => product?.category_id ?? "");
+
+  useEffect(() => {
+    void fetch("/api/seller/categories")
+      .then((r) => r.json())
+      .then((json: { data?: Category[] }) => {
+        if (json.data) setDbCategories(json.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (categoryId || !product?.category || !dbCategories.length) return;
+    const match = dbCategories.find((c) => c.name === product.category);
+    if (match) setCategoryId(match.id);
+  }, [categoryId, dbCategories, product?.category]);
   const [price, setPrice] = useState(String(product?.price ?? ""));
   const [unit, setUnit] = useState(product?.unit ?? "kg");
   const [stockQty, setStockQty] = useState(String(product?.stock_quantity ?? (product?.in_stock ? 1 : 0)));
@@ -785,12 +788,8 @@ function ProductModal({
       }
     }
     const listed = activeInBot && sq > 0;
-    const category =
-      categoryMode === "custom"
-        ? categoryCustom.trim() || null
-        : categoryPreset === "Other"
-          ? categoryCustom.trim() || "Other"
-          : categoryPreset;
+    const selectedCat = categoryId ? dbCategories.find((c) => c.id === categoryId) : null;
+    const category = selectedCat?.name ?? null;
 
     const row = {
       seller_id: sellerRow.id,
@@ -799,6 +798,7 @@ function ProductModal({
       image_url: imageUrl.trim() || null,
       aliases: aliasChips,
       category,
+      category_id: selectedCat?.id ?? null,
       price: priceNum,
       unit,
       stock_quantity: listed ? Math.max(1, sq) : 0,
@@ -893,29 +893,17 @@ function ProductModal({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="mb-1.5 text-label text-porter-text-secondary">Category</p>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant={categoryMode === "preset" ? "primary" : "secondary"} onClick={() => setCategoryMode("preset")}>
-                Preset
-              </Button>
-              <Button type="button" size="sm" variant={categoryMode === "custom" ? "primary" : "secondary"} onClick={() => setCategoryMode("custom")}>
-                Custom
-              </Button>
-            </div>
-            {categoryMode === "preset" ? (
-              <Input.Select id="p-cat-pre" label="Preset" value={categoryPreset} onChange={(e) => setCategoryPreset(e.target.value)}>
-                {PRESET_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Input.Select>
-            ) : (
-              <Input.Text id="p-cat-cust" label="Category name" value={categoryCustom} onChange={(e) => setCategoryCustom(e.target.value)} />
-            )}
-            {categoryMode === "preset" && categoryPreset === "Other" && (
-              <Input.Text id="p-cat-other" label="Other (specify)" className="mt-2" value={categoryCustom} onChange={(e) => setCategoryCustom(e.target.value)} />
-            )}
+            <Input.Select id="p-cat" label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">None</option>
+              {dbCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Input.Select>
+            <Link href="/dashboard/categories" className="mt-1 inline-block text-xs text-porter-green-400 hover:underline">
+              Manage categories
+            </Link>
           </div>
           <Input.Text id="p-price" label="Price (₹)" inputVariant="number" required value={price} onChange={(e) => setPrice(e.target.value)} min={0.01} step={0.01} />
         </div>
