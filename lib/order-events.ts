@@ -1,7 +1,7 @@
 import type { PaymentStatus } from "@/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type OrderEventSource = "bot" | "dashboard" | "webhook" | "system";
+export type OrderEventSource = "bot" | "dashboard" | "webhook" | "system" | "storefront";
 
 /** Insert an audit row (service role or seller-scoped client). */
 export async function insertOrderEvent(

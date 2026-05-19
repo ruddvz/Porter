@@ -1,5 +1,5 @@
 import { appendConversationMessage } from "@/lib/conversation-messages";
-import { sendMessage } from "@/lib/meta-whatsapp";
+import { sendMessage } from "@/lib/whatsapp";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 

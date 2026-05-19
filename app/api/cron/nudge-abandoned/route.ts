@@ -1,4 +1,4 @@
-import { sendMessage } from "@/lib/meta-whatsapp";
+import { sendMessage } from "@/lib/whatsapp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import type { Conversation, ConversationContext, Seller } from "@/types";
 import { apiErr, apiOk } from "@/lib/api-json";

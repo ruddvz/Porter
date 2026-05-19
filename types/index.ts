@@ -75,6 +75,12 @@ export interface Seller {
   loyalty_points_enabled?: boolean | null;
   /** Optional referral code for Growth stores. */
   referral_code?: string | null;
+  store_slug?: string | null;
+  whatsapp_provider?: "meta" | "openwa" | string | null;
+  openwa_session_id?: string | null;
+  openwa_session_status?: string | null;
+  pickup_enabled?: boolean | null;
+  delivery_enabled?: boolean | null;
 }
 
 export interface Product {

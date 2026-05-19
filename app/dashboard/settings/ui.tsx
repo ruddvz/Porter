@@ -12,7 +12,18 @@ import { useToast } from "@/components/ui/Toast";
 import PushPrompt from "@/components/dashboard/PushPrompt";
 import { useMemo, useState } from "react";
 
-type Tab = "store" | "delivery" | "payments" | "bot" | "hours" | "meta" | "subscription" | "growth" | "notifications" | "danger";
+type Tab =
+  | "store"
+  | "delivery"
+  | "payments"
+  | "bot"
+  | "hours"
+  | "website"
+  | "meta"
+  | "subscription"
+  | "growth"
+  | "notifications"
+  | "danger";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 

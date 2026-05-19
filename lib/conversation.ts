@@ -86,6 +86,22 @@ const SAME_ORDER_PHRASES = [
   "aaglu j",
 ];
 
+/** Loads seller by OpenWA session id. */
+export async function getSellerByOpenWASessionId(sessionId: string): Promise<Seller | null> {
+  const supabase = createSupabaseServiceRoleClient();
+  const { data, error } = await supabase
+    .from("sellers")
+    .select("*")
+    .eq("openwa_session_id", sessionId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) {
+    console.error("[conversation] seller lookup openwa", error);
+    return null;
+  }
+  return data as Seller | null;
+}
+
 /** Loads seller by Meta phone_number_id (WABA number). */
 export async function getSellerByMetaPhoneNumberId(phoneNumberId: string): Promise<Seller | null> {
   const supabase = createSupabaseServiceRoleClient();

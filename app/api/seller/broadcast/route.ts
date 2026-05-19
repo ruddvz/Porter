@@ -1,4 +1,4 @@
-import { sendMessage } from "@/lib/meta-whatsapp";
+import { sendMessage } from "@/lib/whatsapp";
 import { apiErr, apiOk } from "@/lib/api-json";
 import { checkGate } from "@/lib/plan-gates";
 import { createSupabaseServerClient } from "@/lib/supabase-server";

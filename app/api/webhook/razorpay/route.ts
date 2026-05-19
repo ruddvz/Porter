@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { waitUntil } from "@vercel/functions";
 import { insertOrderEvent } from "@/lib/order-events";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
-import { sendMessage } from "@/lib/meta-whatsapp";
+import { sendMessage } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 

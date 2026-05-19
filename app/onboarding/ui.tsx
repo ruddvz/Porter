@@ -3,6 +3,7 @@
 import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/Button";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { slugifyStoreName } from "@/lib/store-slug";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -72,7 +73,9 @@ export default function OnboardingForm() {
       .insert({
         user_id: user.id,
         store_name: storeName,
+        store_slug: slugifyStoreName(storeName),
         whatsapp_number: whatsapp,
+        whatsapp_provider: metaPhoneId ? "meta" : "openwa",
         city: city || null,
         delivery_zones,
         meta_phone_number_id: metaPhoneId || null,
