@@ -2,7 +2,7 @@
 
 import type { SidebarNavItem } from "@/components/ui/Sidebar";
 import { cn } from "@/lib/cn";
-import { X } from "lucide-react";
+import { HelpCircle, LogOut, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -11,11 +11,13 @@ export default function MobileMoreSheet({
   onClose,
   items,
   pathname,
+  onLogout,
 }: {
   open: boolean;
   onClose: () => void;
   items: SidebarNavItem[];
   pathname: string;
+  onLogout?: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -26,21 +28,26 @@ export default function MobileMoreSheet({
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="More navigation">
-      <button type="button" className="absolute inset-0 bg-black/60" aria-label="Close menu" onClick={onClose} />
-      <div className="absolute bottom-0 left-0 right-0 max-h-[min(85dvh,520px)] overflow-y-auto rounded-t-2xl border border-porter-bg-border bg-porter-bg-elevated pb-[env(safe-area-inset-bottom)]">
+      <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-label="Close menu" onClick={onClose} />
+      <div className="absolute bottom-0 left-0 right-0 max-h-[min(88dvh,calc(100dvh-env(safe-area-inset-top)-24px))] overflow-y-auto rounded-t-[var(--po-radius-xl)] border border-porter-bg-border bg-porter-bg-raised shadow-[var(--po-shadow-sheet)]">
+        <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-porter-bg-border" aria-hidden />
         <div className="flex items-center justify-between border-b border-porter-bg-border px-4 py-3">
           <span className="text-title text-porter-text-primary">More</span>
           <button
             ref={closeRef}
             type="button"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-porter-text-secondary hover:bg-porter-bg-surface"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-[var(--po-radius-sm)] text-porter-text-secondary hover:bg-porter-bg-surface"
             aria-label="Close"
             onClick={onClose}
           >
@@ -60,21 +67,43 @@ export default function MobileMoreSheet({
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold",
-                  active ? "bg-porter-green-500/15 text-porter-green-400" : "text-porter-text-secondary hover:bg-porter-bg-surface",
+                  "flex min-h-16 items-center gap-3 rounded-[var(--po-radius-md)] px-4 py-3 text-[15px] font-semibold",
+                  active ? "bg-[var(--po-primary-soft)] text-porter-green-600" : "text-porter-text-secondary hover:bg-porter-bg-surface",
                 )}
               >
                 <Icon className="h-5 w-5 shrink-0" aria-hidden />
                 {item.label}
                 {item.badge != null && item.badge !== 0 ? (
-                  <span className="ml-auto rounded-full bg-porter-orange-500 px-2 py-0.5 text-xs font-bold text-black">
+                  <span className="ml-auto rounded-full bg-porter-orange-500 px-2 py-0.5 text-xs font-bold text-white">
                     {item.badge}
                   </span>
                 ) : null}
               </Link>
             );
           })}
+          <Link
+            href="https://github.com/ruddvz/Porter/blob/main/README.md"
+            onClick={onClose}
+            className="flex min-h-16 items-center gap-3 rounded-[var(--po-radius-md)] px-4 py-3 text-[15px] font-semibold text-porter-text-secondary hover:bg-porter-bg-surface"
+          >
+            <HelpCircle className="h-5 w-5 shrink-0 text-porter-green-600" aria-hidden />
+            Help and setup
+          </Link>
+          {onLogout ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onLogout();
+              }}
+              className="flex min-h-16 w-full items-center gap-3 rounded-[var(--po-radius-md)] px-4 py-3 text-left text-[15px] font-semibold text-porter-orange-500 hover:bg-porter-bg-surface"
+            >
+              <LogOut className="h-5 w-5 shrink-0" aria-hidden />
+              Log out
+            </button>
+          ) : null}
         </nav>
+        <div className="h-[calc(env(safe-area-inset-bottom)+12px)]" aria-hidden />
       </div>
     </div>
   );

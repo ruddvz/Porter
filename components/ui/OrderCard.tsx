@@ -60,7 +60,7 @@ export function OrderCard({
   return (
     <article
       className={cn(
-        "rounded-xl border border-porter-bg-border bg-porter-bg-surface p-4 shadow-card transition-[box-shadow,transform,border-color] duration-base",
+        "rounded-[var(--po-radius-lg)] border border-porter-bg-border bg-porter-bg-surface p-4 shadow-card transition-[box-shadow,transform,border-color] duration-base",
         "hover:shadow-raised hover:border-porter-green-500/25",
         dimmed && "opacity-60 hover:opacity-80",
         isNew && "animate-porter-slide-in-right shadow-glow ring-1 ring-porter-green-500/20",
@@ -88,7 +88,7 @@ export function OrderCard({
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-label text-porter-text-muted">Total</p>
-            <p className="font-display text-3xl tracking-wide text-porter-text-primary">{totalFormatted}</p>
+            <p className="text-2xl font-bold tabular-nums tracking-tight text-porter-text-primary">{totalFormatted}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge kind="status" variant={payment.statusVariant} label={payment.label} size="sm" />

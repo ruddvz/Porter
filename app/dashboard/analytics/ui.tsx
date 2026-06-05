@@ -160,7 +160,7 @@ export default function AnalyticsClient({
       <div className="grid gap-4 sm:grid-cols-2">
         <Card padding="md">
           <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · orders</p>
-          <p className="mt-1 font-display text-2xl text-porter-text-primary">{periodCompare.currentOrders}</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-porter-text-primary">{periodCompare.currentOrders}</p>
           <p className="mt-2 text-xs text-porter-text-muted">
             {periodCompare.labelPrevious}: {periodCompare.previousOrders}{" "}
             <span className="font-medium text-porter-text-secondary">
@@ -170,7 +170,7 @@ export default function AnalyticsClient({
         </Card>
         <Card padding="md">
           <p className="text-label text-porter-text-muted">{periodCompare.labelCurrent} · paid revenue</p>
-          <p className="mt-1 font-display text-2xl text-porter-text-primary">
+          <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-porter-text-primary">
             ₹{Math.round(periodCompare.currentRevenue).toLocaleString("en-IN")}
           </p>
           <p className="mt-2 text-xs text-porter-text-muted">

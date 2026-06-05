@@ -2,74 +2,116 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Porter — Preview & status</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fff8ec" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Porter — WhatsApp-first ordering for local retailers</title>
     <link rel="stylesheet" href="assets/style.css" />
   </head>
   <body>
     <div class="wrap">
-      <header class="hero">
-        <p class="eyebrow">WhatsApp-first ordering for Indian retailers</p>
-        <h1>Porter</h1>
-        <p class="lead">
-          <strong>GitHub Pages only serves this static page.</strong> The seller dashboard, admin console,
-          APIs, and WhatsApp webhooks live in the <strong>Next.js app</strong>, which must be deployed
-          separately (this repo is set up for <strong>Vercel</strong>).
-        </p>
-      </header>
+      <span class="status-pill">Preview launcher</span>
 
-      <section class="card deploy">
-        <h2>Run the real Porter app</h2>
-        <p class="muted" style="margin-top: 0">
-          One click imports this repo into Vercel. After the first deploy finishes, open your
-          <code>*.vercel.app</code> URL, copy every variable from <code>.env.example</code> into the
-          Vercel project <strong>Settings → Environment Variables</strong>, and set
-          <code>NEXT_PUBLIC_APP_URL</code> to that same URL so auth redirects and <code>/track/…</code> links work.
-        </p>
-        <div class="actions">
-          <a
-            class="btn primary"
-            href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fruddvz%2FPorter&amp;project-name=porter"
-            target="_blank"
-            rel="noopener"
-            >Deploy on Vercel</a
-          >
-          <!-- INJECT_LIVE_APP_START -->
-          <!-- INJECT_LIVE_APP_END -->
-          <a
-            class="btn"
-            href="https://github.com/ruddvz/Porter/blob/main/README.md#quick-start"
-            target="_blank"
-            rel="noopener"
-            >Env checklist (README)</a
-          >
+      <div class="wordmark">
+        <div class="wordmark-icon" aria-hidden="true">P</div>
+        <span class="wordmark-text">Porter</span>
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <!-- INJECT_HERO_START -->
+          <h1>Run Porter like an app.</h1>
+          <p class="subtitle">
+            Seller dashboard, orders, inventory, chats, tracking, and admin live in the Next.js app.
+          </p>
+          <!-- INJECT_HERO_END -->
+
+          <div class="actions">
+            <!-- INJECT_PRIMARY_CTA_START -->
+            <a
+              class="btn primary"
+              href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fruddvz%2FPorter&amp;project-name=porter"
+              target="_blank"
+              rel="noopener"
+              >Deploy real app on Vercel</a
+            >
+            <!-- INJECT_PRIMARY_CTA_END -->
+            <!-- INJECT_SECONDARY_CTA_START -->
+            <a class="btn" href="https://github.com/ruddvz/Porter/blob/main/README.md#quick-start" target="_blank" rel="noopener"
+              >Open setup checklist</a
+            >
+            <!-- INJECT_SECONDARY_CTA_END -->
+          </div>
+
+          <!-- INJECT_STATUS_CARD_START -->
+          <div class="status-card preview">
+            <h3>Preview page only</h3>
+            <p>
+              GitHub Pages can show this launcher, but dashboards, login, APIs, webhooks, checkout, and admin need the
+              Next.js deployment.
+            </p>
+          </div>
+          <!-- INJECT_STATUS_CARD_END -->
         </div>
-      </section>
 
-      <section class="card">
-        <h2>Where to see the real UI</h2>
-        <ul class="list">
-          <li><strong>Seller dashboard</strong> — Kanban, orders, settings, analytics (after login).</li>
-          <li><strong>Public order tracking</strong> — <code>/track/&lt;slug&gt;</code> (link sent in WhatsApp after checkout).</li>
-          <li><strong>Admin console</strong> — Platform overview, live activity feed, CSV export link.</li>
-        </ul>
-        <p class="muted">
-          Optional: in this GitHub repo, add a variable <code>PORTER_LIVE_URL</code> (Settings → Secrets and
-          variables → Actions → Variables) with your production URL; the next Pages deploy will show an
-          <strong>Open live app</strong> button above.
-        </p>
-      </section>
-
-      <section class="card">
-        <h2>Quick links</h2>
-        <div class="actions">
-          <a class="btn" href="https://github.com/ruddvz/Porter" target="_blank" rel="noopener">Repository</a>
-          <a class="btn" href="status.html">Feature checklist</a>
+        <div class="mock-phone" aria-hidden="true">
+          <div class="mock-notch"></div>
+          <p class="mock-header">Today</p>
+          <div class="mock-stat">
+            <strong>3 orders need action</strong>
+            <span>Accept, prepare, or contact customers</span>
+          </div>
+          <div class="mock-row">
+            <span>Sales today</span>
+            <span class="amount">₹4,820</span>
+          </div>
+          <div class="mock-row">
+            <span>Low stock</span>
+            <span>6 items</span>
+          </div>
+          <span class="mock-cta">Review orders</span>
         </div>
-      </section>
+      </div>
+
+      <div class="feature-grid">
+        <article class="card">
+          <div class="card-icon green" aria-hidden="true">📦</div>
+          <h3>Seller dashboard</h3>
+          <p>Live orders, inventory, chats, analytics, and settings — built for one-handed iPhone use.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon orange" aria-hidden="true">📍</div>
+          <h3>Customer tracking</h3>
+          <p>Share track links after checkout so customers know when their order is preparing or out for delivery.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon blue" aria-hidden="true">🛡</div>
+          <h3>Admin console</h3>
+          <p>Platform overview, seller management, webhooks, and safe impersonation for support.</p>
+        </article>
+      </div>
+
+      <details class="accordion">
+        <summary>Setup checklist</summary>
+        <div class="content">
+          <ol>
+            <li>Deploy this repo to Vercel (one-click button above).</li>
+            <li>Copy every variable from <code>.env.example</code> into Vercel Environment Variables.</li>
+            <li>Set <code>NEXT_PUBLIC_APP_URL</code> to your Vercel URL for auth and track links.</li>
+            <li>Optional: add repository variable <code>PORTER_LIVE_URL</code> so this page shows an Open Dashboard button.</li>
+            <li>Sign up, complete onboarding, and share your store link.</li>
+          </ol>
+        </div>
+      </details>
 
       <footer class="foot">
-        <p>Built for UPI + cash workflows — Razorpay links optional.</p>
+        <p>Built for UPI, COD, and WhatsApp-first local retail.</p>
+        <div class="foot-links">
+          <a href="https://github.com/ruddvz/Porter" target="_blank" rel="noopener">Repository</a>
+          <a href="status.html">Feature checklist</a>
+          <a href="https://github.com/ruddvz/Porter/blob/main/README.md" target="_blank" rel="noopener">README</a>
+        </div>
       </footer>
     </div>
   </body>

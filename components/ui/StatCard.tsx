@@ -34,7 +34,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-porter-bg-border bg-porter-bg-surface p-4 shadow-card md:p-5",
+        "rounded-[var(--po-radius-lg)] border border-porter-bg-border bg-porter-bg-surface p-4 shadow-card md:p-5",
         className,
       )}
     >
@@ -46,7 +46,7 @@ export function StatCard({
         </div>
       ) : (
         <>
-          <p className={cn("mt-2 flex flex-wrap items-baseline gap-1 font-display text-display", toneCls)}>
+          <p className={cn("mt-2 flex flex-wrap items-baseline gap-1 text-2xl font-bold tabular-nums tracking-tight", toneCls)}>
             {prefix && <span className="text-porter-text-secondary">{prefix}</span>}
             <span>{value}</span>
           </p>

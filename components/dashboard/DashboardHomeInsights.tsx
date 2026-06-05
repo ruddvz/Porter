@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-/** Plan0 §4 — home trend chart, fulfillment snapshot, recent orders, low-stock hints. */
+/** Home trend chart, fulfillment snapshot, recent orders, low-stock hints. */
 export default function DashboardHomeInsights({
   orders,
   lowStockProducts,
@@ -61,32 +61,37 @@ export default function DashboardHomeInsights({
             <AreaChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="dash-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#25D366" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#25D366" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#0f7a3a" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#0f7a3a" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-              <XAxis dataKey="label" tick={{ fill: "#a0a0a0", fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fill: "#a0a0a0", fontSize: 11 }} width={36} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--po-line)" />
+              <XAxis dataKey="label" tick={{ fill: "var(--po-muted)", fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fill: "var(--po-muted)", fontSize: 11 }} width={36} />
               <Tooltip
-                contentStyle={{ background: "#111", border: "1px solid #2a2a2a", borderRadius: 8 }}
-                labelStyle={{ color: "#f5f5f5" }}
+                contentStyle={{
+                  background: "var(--po-surface)",
+                  border: "1px solid var(--po-line)",
+                  borderRadius: 12,
+                  color: "var(--po-text)",
+                }}
+                labelStyle={{ color: "var(--po-text-soft)" }}
               />
-              <Area type="monotone" dataKey="count" stroke="#25D366" fill="url(#dash-area)" strokeWidth={2} />
+              <Area type="monotone" dataKey="count" stroke="#0f7a3a" fill="url(#dash-area)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </Card>
       <Card padding="md">
         <h2 className="text-title text-porter-text-primary">Fulfillment</h2>
-        <p className="mt-3 font-display text-4xl text-porter-green-400">{fulfillmentPct}%</p>
+        <p className="mt-3 text-4xl font-bold tabular-nums tracking-tight text-porter-green-600">{fulfillmentPct}%</p>
         <p className="mt-1 text-xs text-porter-text-muted">Delivered ÷ non-cancelled orders on this board</p>
       </Card>
 
       <Card padding="md" className="lg:col-span-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-title text-porter-text-primary">Recent orders</h2>
-          <Link href="/dashboard/orders" className="text-xs font-semibold text-porter-green-400 hover:underline">
+          <Link href="/dashboard/orders" className="text-xs font-semibold text-porter-green-600 hover:underline">
             History
           </Link>
         </div>
@@ -97,12 +102,12 @@ export default function DashboardHomeInsights({
             recent.map((o) => (
               <li
                 key={o.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-porter-bg-border bg-porter-bg-surface px-3 py-2 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface px-3 py-2 text-sm"
               >
                 <span className="font-mono text-porter-text-secondary">#{o.id.slice(0, 8)}</span>
                 <span className="text-porter-text-primary">{o.customer_name ?? o.customer_phone}</span>
                 <Badge kind="status" variant={orderStatusBadge(o.status).variant} label={orderStatusBadge(o.status).label} size="sm" />
-                <span className="font-semibold text-porter-text-primary">{formatCurrencyInr(Number(o.total_amount ?? 0))}</span>
+                <span className="font-semibold tabular-nums text-porter-text-primary">{formatCurrencyInr(Number(o.total_amount ?? 0))}</span>
               </li>
             ))
           )}
@@ -125,7 +130,7 @@ export default function DashboardHomeInsights({
           )}
         </ul>
         {lowStockProducts.length > 0 ? (
-          <Link href="/dashboard/inventory" className="mt-3 inline-block text-xs text-porter-green-400 hover:underline">
+          <Link href="/dashboard/inventory" className="mt-3 inline-block text-xs text-porter-green-600 hover:underline">
             Open inventory
           </Link>
         ) : null}
