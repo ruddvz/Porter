@@ -26,7 +26,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#25D366",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#07111f" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0f0d" },
+  ],
   viewportFit: "cover",
 };
 
@@ -40,7 +43,9 @@ export default function RootLayout({
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="application-name" content="Porter" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" sizes="180x180" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className={`${GeistSans.className} grain min-h-screen font-sans antialiased text-porter-text-primary`}>
         <a

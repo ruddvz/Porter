@@ -1,4 +1,6 @@
-# Porter — Improvement Plan
+# Porter — Improvement Plan (historical)
+
+> **Not the current source of truth.** Use [PORTER_FIX_PLAN.md](./PORTER_FIX_PLAN.md) and [AGENT_PROGRESS.md](./AGENT_PROGRESS.md) for active work.
 
 > **What this is:** A clear, prioritized plan for making Porter better — across UI/UX, system design, reliability, and business logic. It reviews the two open PRs, the current codebase state, and lists every gap found, with a simplified execution roadmap at the end.
 

@@ -1,5 +1,5 @@
 /* Porter seller dashboard — offline shell + Plan0-style fetch routing */
-const CACHE = "porter-seller-v3";
+const CACHE = "porter-seller-v4";
 const STATIC_EXT = /\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?)$/i;
 
 self.addEventListener("install", (event) => {
@@ -85,6 +85,12 @@ self.addEventListener("push", (event) => {
       data: { url: data.url || "/dashboard/orders" },
     })
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("notificationclick", (event) => {

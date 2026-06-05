@@ -2,6 +2,8 @@
 
 **WhatsApp-first dark-store SaaS** — turn natural-language chats into confirmed orders, payment links, and a dashboard your team can run day to day.
 
+**Current implementation plan:** [docs/PORTER_FIX_PLAN.md](docs/PORTER_FIX_PLAN.md) · **Agent progress:** [docs/AGENT_PROGRESS.md](docs/AGENT_PROGRESS.md)
+
 ## Live app (this is not GitHub Pages)
 
 If you open **`*.github.io`** for this project, you only see the **static** site from the `docs/` folder. **Dashboards, `/admin`, APIs, and webhooks are all in the Next.js app**, which GitHub Pages cannot run.
@@ -57,7 +59,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Link project: `supabase link` (or use Dashboard SQL editor).
 2. Run migration: paste `supabase/migrations/001_initial_schema.sql` into **SQL Editor** → Run, or use `supabase db push` if CLI is configured.
-3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql`, then **`006_plan_complete.sql`** (full rollout: products + orders `preparing`, seller fields, `platform_settings`, push tables, storage bucket), then **`007_order_items_seller_id.sql`** (denormalizes `seller_id` on `order_items` for realtime line-item updates), then **`008_seller_delivery_extras.sql`** (seller timezone, minimum order, delivery fee, off-hours message), then **`009_order_events.sql`** (`order_events` audit trail + optional `meta_access_token_enc`), then **`010_phase4_platform_events_track_loyalty.sql`**, **`011_referral_codes.sql`**, **`012_realtime_platform_events.sql`** (admin live feed), then **`013_conversation_messages.sql`** (WhatsApp thread persistence + Realtime for seller Chats), then **`014_products_sort_order.sql`** (manual product ordering / drag reorder). If you previously applied **`006_product_fields_and_order_preparing.sql`** only, compare with `006_plan_complete.sql` and apply any missing pieces (do not run duplicate conflicting `ALTER`s blindly).
+3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql`, then **`006_plan_complete.sql`** (full rollout: products + orders `preparing`, seller fields, `platform_settings`, push tables, storage bucket), then **`007_order_items_seller_id.sql`** (denormalizes `seller_id` on `order_items` for realtime line-item updates), then **`008_seller_delivery_extras.sql`** (seller timezone, minimum order, delivery fee, off-hours message), then **`009_order_events.sql`** (`order_events` audit trail + optional `meta_access_token_enc`), then **`010_phase4_platform_events_track_loyalty.sql`**, **`011_referral_codes.sql`**, **`012_realtime_platform_events.sql`** (admin live feed), then **`013_conversation_messages.sql`** (WhatsApp thread persistence + Realtime for seller Chats), then **`014_products_sort_order.sql`** (manual product ordering / drag reorder), then **`018_webhook_idempotency.sql`** (deduplicate WhatsApp/Razorpay webhooks). If you previously applied **`006_product_fields_and_order_preparing.sql`** only, compare with `006_plan_complete.sql` and apply any missing pieces (do not run duplicate conflicting `ALTER`s blindly).
 
    **Note:** Session 5 was originally named `002_conversation_nudge.sql`; that collided with other `002` migrations. Use **`005_conversation_nudge.sql`** only. If you already ran the old file, skip `005` — the `ALTER` is idempotent.
 

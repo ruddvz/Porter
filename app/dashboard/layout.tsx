@@ -2,6 +2,7 @@ import { Bebas_Neue, DM_Sans, JetBrains_Mono } from "next/font/google";
 import ShopDashboardShell from "@/components/dashboard/ShopDashboardShell";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { IMPERSONATION_COOKIE_NAME, verifyImpersonationCookie } from "@/lib/impersonation-cookie";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -17,17 +18,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/auth/login");
 
   const cookieStore = await cookies();
-  const impersonateSellerId = cookieStore.get("porter_admin_impersonate")?.value ?? null;
+  const impersonateRaw = cookieStore.get(IMPERSONATION_COOKIE_NAME)?.value ?? null;
+  const verified = verifyImpersonationCookie(impersonateRaw, user.id);
 
   let seller = null as import("@/types").Seller | null;
   let impersonating = false;
 
-  if (impersonateSellerId && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (verified?.sellerId && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
       const admin = createSupabaseAdminClient();
       const { data: adminRow } = await admin.from("admin_users").select("id").eq("user_id", user.id).maybeSingle();
       if (adminRow) {
-        const { data: s } = await admin.from("sellers").select("*").eq("id", impersonateSellerId).maybeSingle();
+        const { data: s } = await admin.from("sellers").select("*").eq("id", verified.sellerId).maybeSingle();
         seller = s as import("@/types").Seller | null;
         impersonating = !!seller;
       }
