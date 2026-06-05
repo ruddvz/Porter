@@ -108,13 +108,23 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
 
   if (placedTrack !== null) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-porter-bg-base p-8">
-        <h1 className="text-2xl font-semibold text-porter-green-500">Order placed</h1>
-        {placedTrack ? (
-          <a href={placedTrack} className="mt-6 font-semibold text-porter-green-600 underline">
-            Track order
-          </a>
-        ) : null}
+      <main className="flex min-h-screen flex-col items-center justify-center bg-porter-bg-base px-6 py-12 text-center safe-bottom">
+        <div className="max-w-sm space-y-4 rounded-[var(--po-radius-xl)] border border-porter-bg-border bg-porter-bg-surface p-8 shadow-card">
+          <h1 className="text-2xl font-bold text-porter-green-600">Order placed</h1>
+          <p className="text-sm text-porter-text-secondary">We sent your order to the store.</p>
+          {placedTrack ? (
+            <a href={placedTrack} className="inline-flex min-h-12 w-full items-center justify-center rounded-[var(--po-radius-pill)] bg-porter-green-500 px-6 font-semibold text-white">
+              Track order
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="min-h-11 w-full text-sm font-semibold text-porter-green-600"
+            onClick={() => setPlacedTrack(null)}
+          >
+            Continue shopping
+          </button>
+        </div>
       </main>
     );
   }

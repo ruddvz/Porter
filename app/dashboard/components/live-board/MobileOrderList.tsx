@@ -60,7 +60,7 @@ export default function MobileOrderList({
                   <p className="truncate font-semibold text-porter-text-primary">{o.customer_name || "Customer"}</p>
                   <p className="text-mono text-xs text-porter-text-muted">{o.customer_phone}</p>
                 </div>
-                <span className="shrink-0 font-display text-lg tabular-nums text-porter-text-primary">
+                <span className="shrink-0 text-lg font-bold tabular-nums text-porter-text-primary">
                   {formatCurrencyInr(o.total_amount)}
                 </span>
               </div>

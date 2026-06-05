@@ -3,8 +3,10 @@
 import DashboardHomeInsights from "@/components/dashboard/DashboardHomeInsights";
 import SetupChecklistCard from "@/components/dashboard/SetupChecklistCard";
 import OrderDetailPanel from "@/components/orders/OrderDetailPanel";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { HeroCard } from "@/components/ui/HeroCard";
 import { Input } from "@/components/ui/Input";
 import { StatCard } from "@/components/ui/StatCard";
 import { useRealtimeOrders } from "@/lib/hooks/useRealtimeOrders";
@@ -231,7 +233,7 @@ export default function LiveOrdersBoard({
       .filter((o) => o.payment_status === "paid" || o.payment_status === "cod_collected")
       .reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
     const paidCount = today.filter((o) => o.payment_status === "paid" || o.payment_status === "cod_collected").length;
-    const pendingNow = typed.filter((o) => o.status === "pending").length;
+    const pendingNow = typed.filter((o) => ["pending", "confirmed", "preparing"].includes(o.status)).length;
     return { total: today.length, revenue, paidCount, pendingNow };
   }, [typed]);
 
@@ -266,17 +268,54 @@ export default function LiveOrdersBoard({
   return (
     <>
       <div className="px-3 py-4 md:px-6 md:py-6">
-        <SetupChecklistCard items={setupChecklist} />
+        {stats.pendingNow > 0 ? (
+          <HeroCard
+            eyebrow="Needs action"
+            title={`${stats.pendingNow} order${stats.pendingNow === 1 ? "" : "s"} need action`}
+            description="Accept, prepare, or contact customers before they wait too long."
+            variant="orange"
+            actions={
+              <Button type="button" onClick={() => setMobileLayout("list")}>
+                Review now
+              </Button>
+            }
+          />
+        ) : (
+          <HeroCard
+            eyebrow="All caught up"
+            title="No live orders need action right now"
+            description="Share your store link or connect WhatsApp to start receiving orders."
+            variant="green"
+            actions={
+              seller.store_slug ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const url = `${window.location.origin}/store/${seller.store_slug}`;
+                    void navigator.clipboard?.writeText(url);
+                  }}
+                >
+                  Copy store link
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+
+        <div className="mt-4">
+          <SetupChecklistCard items={setupChecklist} />
+        </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Today's orders" value={stats.total} />
-          <StatCard label="Today's revenue" value={Math.round(stats.revenue).toLocaleString("en-IN")} prefix="₹" />
+          <StatCard label="Orders today" value={stats.total} />
+          <StatCard label="Sales today" value={Math.round(stats.revenue).toLocaleString("en-IN")} prefix="₹" />
           <StatCard
-            label="Pending right now"
+            label="Pending now"
             value={stats.pendingNow}
             valueTone={stats.pendingNow > 0 ? "warning" : "default"}
           />
-          <StatCard label="Paid orders" value={stats.paidCount} valueTone="success" />
+          <StatCard label="Low stock" value={lowStockProducts.length} valueTone={lowStockProducts.length > 0 ? "warning" : "default"} />
         </div>
 
         <DashboardHomeInsights orders={typed} lowStockProducts={lowStockProducts} />

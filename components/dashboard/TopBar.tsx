@@ -126,8 +126,17 @@ export default function TopBar({
   const router = useRouter();
   const [bellOpen, setBellOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -192,7 +201,7 @@ export default function TopBar({
                 </span>
               )}
             </button>
-            {bellOpen && (
+            {bellOpen && !isMobile && (
               <div className="absolute right-0 top-12 z-50 hidden w-[min(100vw-2rem,320px)] rounded-[var(--po-radius-lg)] border border-porter-bg-border bg-porter-bg-raised p-2 shadow-modal lg:block">
                 <p className="px-2 py-1 text-label text-porter-text-muted">New orders</p>
                 <NotificationList recentPendingOrders={recentPendingOrders} onNavigate={() => setBellOpen(false)} />
@@ -219,7 +228,7 @@ export default function TopBar({
             >
               {initials(seller.store_name)}
             </button>
-            {userOpen && (
+            {userOpen && !isMobile && (
               <div className="absolute right-0 top-12 z-50 hidden w-52 rounded-[var(--po-radius-lg)] border border-porter-bg-border bg-porter-bg-raised py-1 shadow-modal lg:block">
                 <ProfileMenu seller={seller} onClose={() => setUserOpen(false)} />
               </div>
@@ -228,7 +237,7 @@ export default function TopBar({
         </div>
       </header>
 
-      <Drawer open={bellOpen} onClose={() => setBellOpen(false)} title="New orders" className="lg:hidden">
+      <Drawer open={bellOpen && isMobile} onClose={() => setBellOpen(false)} title="New orders">
         <NotificationList recentPendingOrders={recentPendingOrders} onNavigate={() => setBellOpen(false)} />
         <Link
           href="/dashboard"
@@ -239,7 +248,7 @@ export default function TopBar({
         </Link>
       </Drawer>
 
-      <Drawer open={userOpen} onClose={() => setUserOpen(false)} title="Account" className="lg:hidden">
+      <Drawer open={userOpen && isMobile} onClose={() => setUserOpen(false)} title="Account">
         <ProfileMenu seller={seller} onClose={() => setUserOpen(false)} />
       </Drawer>
     </>

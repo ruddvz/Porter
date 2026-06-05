@@ -487,7 +487,7 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
                 ))}
               </div>
             )}
-            <p className="mt-3 font-display text-2xl tracking-wide text-porter-text-primary">
+            <p className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-porter-text-primary">
               ₹{p.price} <span className="text-sm font-sans text-porter-text-muted">/ {p.unit}</span>
             </p>
             {p.category && (

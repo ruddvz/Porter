@@ -93,7 +93,7 @@
 
   --app-header-height: 64px;
   --app-topbar-height: 64px;
-  --app-bottom-nav-height: 78px;
+  --app-bottom-nav-height: 86px;
 
   --shadow-card: var(--po-shadow-card);
   --shadow-raised: var(--po-shadow-floating);
@@ -166,7 +166,7 @@
   }
 
   .app-bottom-spacer {
-    padding-bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom) + 0.5rem);
+    padding-bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom) + 1rem);
   }
 
   .scroll-pb-app {

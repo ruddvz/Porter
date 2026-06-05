@@ -182,7 +182,7 @@ export default function ShopDashboardShell({
           </div>
         </nav>
 
-        <MobileMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} items={mobileMore} pathname={pathname} />
+        <MobileMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} items={mobileMore} pathname={pathname} onLogout={() => void logout()} />
       </div>
     </>
   );

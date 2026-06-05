@@ -643,7 +643,7 @@ export default function SettingsClient({ seller, ordersThisMonth }: { seller: Se
         <Card padding="lg" className="space-y-4">
           <div className="rounded-lg border border-porter-bg-border bg-porter-bg-surface p-4">
             <p className="text-label text-porter-text-muted">Orders this month</p>
-            <p className="mt-1 font-display text-3xl text-porter-text-primary">
+            <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-porter-text-primary">
               {ordersThisMonth}
               <span className="text-lg font-sans text-porter-text-secondary">
                 {" "}

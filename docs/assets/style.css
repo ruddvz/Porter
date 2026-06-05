@@ -445,6 +445,57 @@ body {
   text-decoration: none;
 }
 
+/* Legacy status.html compatibility */
+.hero h1 {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+}
+
+.hero .eyebrow {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--po-primary);
+  margin: 0;
+}
+
+.hero .lead {
+  color: var(--po-muted);
+  font-size: 1rem;
+}
+
+.hero .lead code {
+  background: var(--po-surface-raised);
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.checklist li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--po-line);
+  font-size: 0.95rem;
+}
+
+.checklist li:last-child {
+  border-bottom: none;
+}
+
+.ok {
+  color: var(--po-primary);
+  font-weight: 700;
+}
+
 .foot-links {
   display: flex;
   flex-wrap: wrap;

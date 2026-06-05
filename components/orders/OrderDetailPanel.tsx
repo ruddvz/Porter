@@ -215,19 +215,18 @@ export default function OrderDetailPanel({
       ) ?? [];
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt ${escapeHtml(o.id.slice(0, 8))}</title>
 <style>
-  :root { color-scheme: dark; }
-  body{font-family:ui-sans-serif,system-ui,sans-serif;padding:28px;max-width:520px;margin:0 auto;background:#0a0f0d;color:#e8f5e9;line-height:1.45}
-  h1{font-size:1.35rem;margin:0 0 6px;font-weight:700;letter-spacing:0.02em;color:#25d366}
-  .muted{color:#a3b8a8;font-size:12px}
-  .line{height:1px;background:#1e2d22;margin:16px 0}
+  :root { color-scheme: light; }
+  body{font-family:ui-sans-serif,system-ui,sans-serif;padding:28px;max-width:520px;margin:0 auto;background:#fff8ec;color:#111827;line-height:1.45}
+  h1{font-size:1.35rem;margin:0 0 6px;font-weight:700;letter-spacing:-0.02em;color:#0f7a3a}
+  .muted{color:#667085;font-size:12px}
+  .line{height:1px;background:#eadfce;margin:16px 0}
   table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
-  th{text-align:left;border-bottom:1px solid #1e2d22;padding:10px 6px;color:#5c7a63;font-size:11px;text-transform:uppercase;letter-spacing:0.06em}
-  td{padding:10px 6px;border-bottom:1px solid #162019}
+  th{text-align:left;border-bottom:1px solid #eadfce;padding:10px 6px;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:0.06em}
+  td{padding:10px 6px;border-bottom:1px solid #f5efe3}
   .num{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
-  .tot{margin-top:14px;font-size:15px;display:flex;justify-content:space-between;color:#a3b8a8}
-  .grand{font-weight:700;font-size:18px;margin-top:10px;display:flex;justify-content:space-between;color:#f5fcf7}
-  .accent{color:#25d366}
-  @media print{body{padding:16px;background:#fff;color:#111}.muted{color:#555}th{color:#666}td{border-color:#eee}.grand,.accent{color:#111}}
+  .tot{margin-top:14px;font-size:15px;display:flex;justify-content:space-between;color:#667085}
+  .grand{font-weight:700;font-size:18px;margin-top:10px;display:flex;justify-content:space-between;color:#111827}
+  .accent{color:#0f7a3a}
 </style></head><body>
   <h1>${escapeHtml(seller.store_name)}</h1>
   <p class="muted">${seller.city ? escapeHtml(seller.city) + " · " : ""}<span class="accent">Order #${escapeHtml(o.id.slice(0, 8))}</span></p>
