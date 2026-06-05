@@ -1,6 +1,19 @@
 "use client";
 
-import { stockDisplayLabel } from "@/lib/inventory";
+import {
+  CartBar,
+  CartSheet,
+  CategoryStrip,
+  CheckoutSheet,
+  ProductCard,
+  StoreEmptyState,
+  StorefrontSuccess,
+  StoreHeader,
+  type FulfillmentType,
+  type PublicProduct,
+  type PublicStore,
+  type StorefrontPaymentMethod,
+} from "@/components/storefront";
 import {
   loadStorefrontCart,
   mergeCartLine,
@@ -10,32 +23,24 @@ import {
 } from "@/lib/storefront-cart";
 import { useEffect, useMemo, useState } from "react";
 
-export type PublicStore = {
-  id: string;
-  store_name: string;
-  store_slug: string;
-  city: string | null;
-  cod_enabled: boolean;
-  delivery_enabled: boolean;
-  pickup_enabled: boolean;
-};
-
-export type PublicProduct = {
-  id: string;
-  name: string;
-  price: number;
-  unit: string;
-  stock_quantity: number;
-  in_stock: boolean;
-};
+export type { PublicProduct, PublicStore };
 
 export default function StorefrontClient({ store, products }: { store: PublicStore; products: PublicProduct[] }) {
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
   const [cart, setCart] = useState<StorefrontCartLine[]>([]);
   const [cartNotice, setCartNotice] = useState<string | null>(null);
-  const [checkout, setCheckout] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [fulfillment, setFulfillment] = useState<FulfillmentType>(
+    store.delivery_enabled && !store.pickup_enabled ? "delivery" : "pickup",
+  );
+  const [deliveryArea, setDeliveryArea] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<StorefrontPaymentMethod>(store.cod_enabled ? "cod" : "razorpay");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [placedTrack, setPlacedTrack] = useState<string | null>(null);
@@ -52,12 +57,33 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
     saveStorefrontCart(store.store_slug, cart);
   }, [cart, store.store_slug]);
 
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      if (p.category?.trim()) set.add(p.category.trim());
+    }
+    return ["all", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return products.filter((p) => !q || p.name.toLowerCase().includes(q));
-  }, [products, search]);
+    return products.filter((p) => {
+      if (category !== "all" && (p.category?.trim() ?? "") !== category) return false;
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q);
+    });
+  }, [products, search, category]);
 
-  const total = cart.reduce((s, l) => s + l.qty * Number(l.price), 0);
+  const subtotal = cart.reduce((s, l) => s + l.qty * Number(l.price), 0);
+  const deliveryFee =
+    fulfillment === "delivery" && store.delivery_fee != null ? Math.max(0, Number(store.delivery_fee)) : 0;
+  const itemCount = cart.reduce((n, l) => n + l.qty, 0);
+
+  const qtyByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of cart) map.set(l.productId, l.qty);
+    return map;
+  }, [cart]);
 
   function addToCart(p: PublicProduct) {
     setCart((c) =>
@@ -83,198 +109,129 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
   async function placeOrder() {
     setBusy(true);
     setErr(null);
+
+    const minOrder = store.min_order_amount != null ? Number(store.min_order_amount) : 0;
+    if (minOrder > 0 && subtotal < minOrder) {
+      setErr(`Minimum order is ₹${Math.round(minOrder).toLocaleString("en-IN")}. Add more items.`);
+      setBusy(false);
+      return;
+    }
+    if (!name.trim() || !phone.trim()) {
+      setErr("Please enter your name and phone.");
+      setBusy(false);
+      return;
+    }
+    if (fulfillment === "delivery" && !address.trim()) {
+      setErr("Please enter your delivery address.");
+      setBusy(false);
+      return;
+    }
+
     const res = await fetch(`/api/public/stores/${store.store_slug}/orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        customerName: name,
-        customerPhone: phone,
-        fulfillmentType: "pickup",
-        paymentMethod: store.cod_enabled ? "cod" : "razorpay",
+        customerName: name.trim(),
+        customerPhone: phone.trim(),
+        fulfillmentType: fulfillment,
+        deliveryArea: fulfillment === "delivery" ? deliveryArea.trim() || undefined : undefined,
+        deliveryAddress: fulfillment === "delivery" ? address.trim() : undefined,
+        paymentMethod,
+        notes: notes.trim() || undefined,
         items: cart.map((l) => ({ productId: l.productId, quantity: l.qty })),
       }),
     });
     const json = (await res.json()) as { data?: { trackUrl?: string }; error?: { message?: string } };
     setBusy(false);
     if (!res.ok) {
-      setErr(json.error?.message ?? "Order failed");
+      setErr(json.error?.message ?? "Order failed. Please try again.");
       return;
     }
     setPlacedTrack(json.data?.trackUrl ?? "");
     setCart([]);
     saveStorefrontCart(store.store_slug, []);
-    setCheckout(false);
+    setCheckoutOpen(false);
+    setCartOpen(false);
   }
 
   if (placedTrack !== null) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-porter-bg-base px-6 py-12 text-center safe-bottom">
-        <div className="max-w-sm space-y-4 rounded-[var(--po-radius-xl)] border border-porter-bg-border bg-porter-bg-surface p-8 shadow-card">
-          <h1 className="text-2xl font-bold text-porter-green-600">Order placed</h1>
-          <p className="text-sm text-porter-text-secondary">We sent your order to the store.</p>
-          {placedTrack ? (
-            <a href={placedTrack} className="inline-flex min-h-12 w-full items-center justify-center rounded-[var(--po-radius-pill)] bg-porter-green-500 px-6 font-semibold text-white">
-              Track order
-            </a>
-          ) : null}
-          <button
-            type="button"
-            className="min-h-11 w-full text-sm font-semibold text-porter-green-600"
-            onClick={() => setPlacedTrack(null)}
-          >
-            Continue shopping
-          </button>
-        </div>
-      </main>
-    );
+    return <StorefrontSuccess trackUrl={placedTrack} onContinue={() => setPlacedTrack(null)} />;
   }
 
   return (
-    <main className="min-h-screen bg-porter-bg-base pb-28 safe-bottom">
-      <header className="safe-top border-b border-porter-bg-border bg-gradient-to-br from-porter-bg-surface to-[var(--po-bg-warm)] px-4 py-5 shadow-card">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--po-radius-md)] bg-[var(--po-primary-soft)] text-lg font-bold text-porter-green-600">
-            {store.store_name.charAt(0).toUpperCase()}
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold text-porter-text-primary">{store.store_name}</h1>
-            <p className="text-sm text-porter-text-muted">
-              {store.city ?? "Local store"}
-              {store.pickup_enabled && store.delivery_enabled
-                ? " · Pickup & delivery"
-                : store.delivery_enabled
-                  ? " · Delivery"
-                  : " · Pickup"}
-            </p>
-          </div>
-        </div>
-        <input
-          className="mt-4 w-full min-h-12 rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface px-3 text-base text-porter-text-primary outline-none focus:border-porter-green-500 focus:ring-2 focus:ring-porter-green-500/20"
-          placeholder="Search products"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search products"
-        />
-      </header>
+    <main className="min-h-screen bg-porter-bg-base pb-32 safe-bottom">
+      <StoreHeader store={store} search={search} onSearchChange={setSearch} />
+      <CategoryStrip categories={categories} active={category} onChange={setCategory} />
 
       {cartNotice ? (
-        <p className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+        <p className="mx-4 mt-3 rounded-[var(--po-radius-md)] bg-[var(--po-warning-soft)] px-3 py-2 text-sm text-porter-orange-600" role="status">
           {cartNotice}
         </p>
       ) : null}
 
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center px-6 py-16 text-center">
-          <p className="text-lg font-medium text-porter-text-primary">
-            {products.length === 0 ? "No products available" : "No matches for your search"}
-          </p>
-          <p className="mt-2 text-sm text-porter-text-muted">
-            {products.length === 0 ? "Check back soon or message the store on WhatsApp." : "Try a different search term."}
-          </p>
-        </div>
+      {products.length === 0 ? (
+        <StoreEmptyState variant="no-products" />
+      ) : filtered.length === 0 ? (
+        <StoreEmptyState
+          variant="no-search"
+          onClearSearch={() => {
+            setSearch("");
+            setCategory("all");
+          }}
+        />
       ) : (
-        <ul className="grid gap-3 p-4 sm:grid-cols-2">
+        <ul className="grid gap-3 p-4 md:max-w-2xl md:mx-auto lg:max-w-4xl lg:grid-cols-2">
           {filtered.map((p) => (
-            <li key={p.id} className="rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface p-4 shadow-card">
-              <p className="font-semibold text-porter-text-primary">{p.name}</p>
-              <p className="text-porter-green-600">₹{p.price}</p>
-              <p className="text-xs text-porter-text-muted">{stockDisplayLabel(p.stock_quantity ?? 0)}</p>
-              <button
-                type="button"
-                className="mt-3 min-h-11 rounded-[var(--po-radius-sm)] bg-porter-green-500 px-4 py-2 text-base font-semibold text-white disabled:opacity-50"
-                disabled={!p.in_stock}
-                onClick={() => addToCart(p)}
-              >
-                Add
-              </button>
-            </li>
+            <ProductCard
+              key={p.id}
+              product={p}
+              qty={qtyByProduct.get(p.id) ?? 0}
+              onAdd={() => addToCart(p)}
+              onSetQty={(qty) => setQty(p.id, qty)}
+            />
           ))}
         </ul>
       )}
 
-      {cart.length > 0 ? (
-        <div className="mx-4 mb-4 rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface p-3 shadow-card">
-          <p className="text-sm font-semibold">Cart</p>
-          <ul className="mt-2 space-y-2">
-            {cart.map((l) => (
-              <li key={l.productId} className="flex items-center justify-between gap-2 text-sm">
-                <span>
-                  {l.name} × {l.qty}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded border"
-                    aria-label={`Decrease ${l.name}`}
-                    onClick={() => setQty(l.productId, l.qty - 1)}
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded border"
-                    aria-label={`Increase ${l.name}`}
-                    onClick={() => setQty(l.productId, l.qty + 1)}
-                  >
-                    +
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <CartBar itemCount={itemCount} total={subtotal} onOpenCart={() => setCartOpen(true)} />
 
-      {cart.length > 0 ? (
-        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-20">
-          <button
-            type="button"
-            className="flex min-h-14 w-full items-center justify-between rounded-[var(--po-radius-pill)] border border-porter-bg-border bg-porter-bg-surface/95 px-5 shadow-[var(--po-shadow-floating)] backdrop-blur"
-            onClick={() => setCheckout(true)}
-          >
-            <span className="text-sm font-semibold text-porter-text-primary">
-              {cart.reduce((n, l) => n + l.qty, 0)} items · ₹{Math.round(total).toLocaleString("en-IN")}
-            </span>
-            <span className="rounded-[var(--po-radius-pill)] bg-porter-green-500 px-4 py-2 text-sm font-bold text-white">
-              View cart
-            </span>
-          </button>
-        </div>
-      ) : null}
+      <CartSheet
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        lines={cart}
+        subtotal={subtotal}
+        deliveryFee={0}
+        onSetQty={setQty}
+        onCheckout={() => {
+          setCartOpen(false);
+          setCheckoutOpen(true);
+        }}
+      />
 
-      {checkout ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-          <div className="w-full max-w-md space-y-3 rounded-[var(--po-radius-lg)] bg-porter-bg-surface p-6 safe-bottom shadow-modal">
-            <input
-              className="w-full rounded border px-3 py-2 text-base"
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              aria-label="Your name"
-            />
-            <input
-              className="w-full rounded border px-3 py-2 text-base"
-              placeholder="Phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              aria-label="Phone number"
-              inputMode="tel"
-            />
-            {err ? <p className="text-sm text-red-600" role="alert">{err}</p> : null}
-            <button
-              type="button"
-              className="min-h-11 w-full rounded-[var(--po-radius-sm)] bg-porter-green-500 py-2 text-base font-semibold text-white"
-              disabled={busy}
-              onClick={() => void placeOrder()}
-            >
-              Place order
-            </button>
-            <button type="button" className="min-h-11 w-full text-sm text-porter-text-muted" onClick={() => setCheckout(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <CheckoutSheet
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        store={store}
+        subtotal={subtotal}
+        deliveryFee={deliveryFee}
+        name={name}
+        phone={phone}
+        fulfillment={fulfillment}
+        deliveryArea={deliveryArea}
+        address={address}
+        paymentMethod={paymentMethod}
+        notes={notes}
+        error={err}
+        busy={busy}
+        onNameChange={setName}
+        onPhoneChange={setPhone}
+        onFulfillmentChange={setFulfillment}
+        onDeliveryAreaChange={setDeliveryArea}
+        onAddressChange={setAddress}
+        onPaymentChange={setPaymentMethod}
+        onNotesChange={setNotes}
+        onPlaceOrder={() => void placeOrder()}
+      />
     </main>
   );
 }

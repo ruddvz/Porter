@@ -25,6 +25,23 @@ export async function createStorefrontOrder(
 ): Promise<{ ok: true; orderId: string; trackSlug: string | null } | { ok: false; error: string }> {
   const supabase = createSupabaseServiceRoleClient();
 
+  const { data: sellerRow } = await supabase
+    .from("sellers")
+    .select("min_order_amount, delivery_fee, delivery_enabled, pickup_enabled, cod_enabled")
+    .eq("id", sellerId)
+    .maybeSingle();
+
+  if (!sellerRow) return { ok: false, error: "Store not found" };
+  if (input.paymentMethod === "cod" && !sellerRow.cod_enabled) {
+    return { ok: false, error: "COD is not enabled for this store" };
+  }
+  if (input.fulfillmentType === "delivery" && sellerRow.delivery_enabled === false) {
+    return { ok: false, error: "Delivery is not available" };
+  }
+  if (input.fulfillmentType === "pickup" && sellerRow.pickup_enabled === false) {
+    return { ok: false, error: "Pickup is not available" };
+  }
+
   const productIds = input.items.map((i) => i.productId);
   const { data: products, error: prodErr } = await supabase
     .from("products")
@@ -61,6 +78,15 @@ export async function createStorefrontOrder(
       unit_price: unitPrice,
       total_price: lineTotal,
     });
+  }
+
+  const minOrder = sellerRow.min_order_amount != null ? Number(sellerRow.min_order_amount) : 0;
+  if (minOrder > 0 && total < minOrder) {
+    return { ok: false, error: `Minimum order is ₹${Math.round(minOrder)}` };
+  }
+
+  if (input.fulfillmentType === "delivery" && sellerRow.delivery_fee != null) {
+    total += Math.max(0, Number(sellerRow.delivery_fee));
   }
 
   const phone = input.customerPhone.replace(/\s/g, "");
