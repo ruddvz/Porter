@@ -27,8 +27,8 @@ function fieldShell({
   return (
     <div
       className={cn(
-        "flex min-h-11 w-full items-center gap-2 rounded-lg border bg-porter-bg-raised px-3 py-2 font-sans text-body text-porter-text-primary transition-[box-shadow,border-color] duration-fast",
-        "border-porter-bg-border focus-within:border-porter-green-500 focus-within:shadow-[0_0_0_3px_rgba(37,211,102,0.15)]",
+        "flex min-h-11 w-full items-center gap-2 rounded-[var(--po-radius-sm)] border bg-porter-bg-surface px-3 py-2 text-body text-porter-text-primary transition-[box-shadow,border-color] duration-fast",
+        "border-porter-bg-border focus-within:border-porter-green-500 focus-within:shadow-[0_0_0_3px_rgba(15,122,58,0.12)]",
         error && "border-porter-orange-500 focus-within:border-porter-orange-500 focus-within:shadow-[0_0_0_3px_rgba(255,107,53,0.12)]",
         disabled && "cursor-not-allowed opacity-50",
       )}

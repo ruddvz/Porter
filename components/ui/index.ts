@@ -1,5 +1,9 @@
 export { Badge } from "./Badge";
+export { ActionBar } from "./ActionBar";
 export { Button } from "./Button";
+export { SearchField } from "./SearchField";
+export { SegmentedControl } from "./SegmentedControl";
+export { StickyBottomAction } from "./StickyBottomAction";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./Button";
 export { Card } from "./Card";
 export type { CardPadding, CardProps, CardVariant } from "./Card";
