@@ -7,16 +7,26 @@ import {
   ConfirmDialog,
   Drawer,
   EmptyState,
+  ErrorState,
+  HeroCard,
   Input,
+  ListRow,
+  LoadingState,
+  MetricCard,
   Modal,
   OrderCard,
+  PaymentBadge,
+  SearchField,
+  SegmentedControl,
   Sidebar,
   Skeleton,
   StatCard,
+  StatusBadge,
+  StickyBottomAction,
   Table,
   useToast,
 } from "@/components/ui";
-import { LayoutDashboard, Package, ScrollText, Settings } from "lucide-react";
+import { LayoutDashboard, Package, ScrollText, Settings, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 
 export default function DesignSystemPage() {
@@ -25,6 +35,7 @@ export default function DesignSystemPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [search, setSearch] = useState("");
 
   return (
     <div className="min-h-screen bg-porter-bg-base pb-24 pt-6 text-porter-text-primary">
@@ -33,9 +44,63 @@ export default function DesignSystemPage() {
           <h1 className="text-display text-porter-green-500">PORTER</h1>
           <p className="mt-2 text-heading">Design system</p>
           <p className="mt-1 text-body text-porter-text-secondary">
-            Session 0 — tokens, typography utilities, and base UI components.
+            Porter Fresh Ops — iOS 26 light design system primitives and states.
           </p>
         </header>
+
+        <HeroCard
+          eyebrow="Seller dashboard"
+          title="3 orders need action"
+          description="Accept, prepare, or contact customers before they wait too long."
+          variant="green"
+          actions={<Button>Review now</Button>}
+        />
+
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Orders today" value="12" icon={ShoppingBag} />
+          <MetricCard label="Sales today" value="₹4,820" subtext="Updated live" />
+          <MetricCard label="Pending now" value="3" />
+          <MetricCard label="Low stock" value="6" />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-title">List rows & badges</h2>
+          <Card padding="sm">
+            <ListRow title="Riya Shah" subtitle="₹420 · 12 mins ago" trailing={<StatusBadge status="pending" />} />
+            <ListRow title="Payment" subtitle="COD order" trailing={<PaymentBadge status="cod_pending" />} />
+          </Card>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status="preparing" />
+            <StatusBadge status="delivered" />
+            <PaymentBadge status="paid" />
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-title">Search & segments</h2>
+          <SearchField value={search} onChange={setSearch} placeholder="Search orders" aria-label="Search orders" />
+          <SegmentedControl
+            options={[
+              { value: "new", label: "New" },
+              { value: "prep", label: "Preparing" },
+              { value: "done", label: "Done" },
+            ]}
+            value="new"
+            onChange={() => undefined}
+          />
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-title">Loading & error</h2>
+          <LoadingState variant="skeleton" />
+          <ErrorState onRetry={() => push("Retried", "info")} />
+        </section>
+
+        <StickyBottomAction>
+          <Button className="w-full" size="lg">
+            Sticky action bar
+          </Button>
+        </StickyBottomAction>
 
         <section className="space-y-4">
           <h2 className="text-title">Badges</h2>

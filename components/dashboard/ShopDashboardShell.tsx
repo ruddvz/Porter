@@ -109,8 +109,8 @@ export default function ShopDashboardShell({
       />
       <div className="min-h-screen scroll-pb-app lg:pl-60">
         {impersonating && (
-          <div className="safe-top sticky top-0 z-40 border-b border-porter-status-cancelled/40 bg-porter-status-cancelled/15 px-4 py-2 text-center text-sm font-semibold text-porter-status-cancelled">
-            Admin view: {seller.store_name}. Use Exit view in the top bar to return.
+          <div className="safe-top sticky top-0 z-40 border-b border-porter-orange-500/30 bg-[var(--po-warning-soft)] px-4 py-2.5 text-center text-sm font-semibold text-porter-orange-600">
+            Admin view: {seller.store_name}. You are viewing this seller workspace. Actions may affect live data.
           </div>
         )}
         <TopBar
@@ -131,10 +131,10 @@ export default function ShopDashboardShell({
         <PWAUpdateBanner />
 
         <nav
-          className="fixed bottom-0 left-0 right-0 z-30 border-t border-porter-bg-border bg-porter-bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[var(--po-shadow-sheet)] backdrop-blur lg:hidden"
+          className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+10px)] z-30 lg:hidden"
           aria-label="Primary"
         >
-          <div className="mx-auto flex max-w-lg justify-around px-1 py-2">
+          <div className="pointer-events-auto mx-auto flex h-[66px] max-w-lg items-center justify-around rounded-[var(--po-radius-pill)] border border-[rgba(234,223,206,0.82)] bg-white/86 px-1 shadow-[0_16px_40px_rgba(17,24,39,0.14)] backdrop-blur-[18px]">
             {mobilePrimary.map((item) => {
               const active =
                 item.href === "/dashboard"
@@ -146,8 +146,10 @@ export default function ShopDashboardShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex min-h-12 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] font-semibold transition-colors",
-                    active ? "text-porter-green-600" : "text-porter-text-muted hover:text-porter-text-secondary",
+                    "flex min-h-11 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-[var(--po-radius-md)] px-2 text-[11px] font-bold transition-colors",
+                    active
+                      ? "bg-[var(--po-primary-soft)] text-porter-green-600"
+                      : "text-porter-text-muted hover:text-porter-text-secondary",
                   )}
                 >
                   <span className="relative inline-flex">
@@ -166,8 +168,10 @@ export default function ShopDashboardShell({
               type="button"
               onClick={() => setMoreOpen(true)}
               className={cn(
-                "flex min-h-12 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] font-semibold transition-colors",
-                moreActive || moreOpen ? "text-porter-green-400" : "text-porter-text-muted hover:text-porter-text-secondary",
+                "flex min-h-11 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-[var(--po-radius-md)] px-2 text-[11px] font-bold transition-colors",
+                moreActive || moreOpen
+                  ? "bg-[var(--po-primary-soft)] text-porter-green-600"
+                  : "text-porter-text-muted hover:text-porter-text-secondary",
               )}
               aria-label="More navigation"
               aria-expanded={moreOpen}

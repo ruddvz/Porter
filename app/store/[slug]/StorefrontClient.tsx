@@ -121,10 +121,25 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
 
   return (
     <main className="min-h-screen bg-porter-bg-base pb-28 safe-bottom">
-      <header className="safe-top border-b border-porter-bg-border bg-porter-bg-surface px-4 py-4 shadow-card">
-        <h1 className="text-xl font-semibold">{store.store_name}</h1>
+      <header className="safe-top border-b border-porter-bg-border bg-gradient-to-br from-porter-bg-surface to-[var(--po-bg-warm)] px-4 py-5 shadow-card">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--po-radius-md)] bg-[var(--po-primary-soft)] text-lg font-bold text-porter-green-600">
+            {store.store_name.charAt(0).toUpperCase()}
+          </span>
+          <div>
+            <h1 className="text-xl font-semibold text-porter-text-primary">{store.store_name}</h1>
+            <p className="text-sm text-porter-text-muted">
+              {store.city ?? "Local store"}
+              {store.pickup_enabled && store.delivery_enabled
+                ? " · Pickup & delivery"
+                : store.delivery_enabled
+                  ? " · Delivery"
+                  : " · Pickup"}
+            </p>
+          </div>
+        </div>
         <input
-          className="mt-3 w-full rounded-lg border px-3 py-2 text-base"
+          className="mt-4 w-full min-h-12 rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface px-3 text-base text-porter-text-primary outline-none focus:border-porter-green-500 focus:ring-2 focus:ring-porter-green-500/20"
           placeholder="Search products"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -200,16 +215,22 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
         </div>
       ) : null}
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-porter-bg-border bg-porter-bg-surface/95 p-4 safe-bottom shadow-[var(--po-shadow-sheet)] backdrop-blur">
-        <button
-          type="button"
-          className="min-h-12 w-full rounded-[var(--po-radius-md)] bg-porter-orange-500 py-3 text-base font-semibold text-white disabled:opacity-50"
-          disabled={cart.length === 0}
-          onClick={() => setCheckout(true)}
-        >
-          Checkout ₹{Math.round(total)}
-        </button>
-      </div>
+      {cart.length > 0 ? (
+        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-20">
+          <button
+            type="button"
+            className="flex min-h-14 w-full items-center justify-between rounded-[var(--po-radius-pill)] border border-porter-bg-border bg-porter-bg-surface/95 px-5 shadow-[var(--po-shadow-floating)] backdrop-blur"
+            onClick={() => setCheckout(true)}
+          >
+            <span className="text-sm font-semibold text-porter-text-primary">
+              {cart.reduce((n, l) => n + l.qty, 0)} items · ₹{Math.round(total).toLocaleString("en-IN")}
+            </span>
+            <span className="rounded-[var(--po-radius-pill)] bg-porter-green-500 px-4 py-2 text-sm font-bold text-white">
+              View cart
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {checkout ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">

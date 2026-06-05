@@ -16,8 +16,8 @@ export default function OfflinePage() {
       <div className="max-w-sm space-y-2">
         <h1 className="text-title text-porter-text-primary">You are offline</h1>
         <p className="text-sm text-porter-text-secondary">
-          Porter needs a network connection to load the dashboard and sync orders. Check your connection and try
-          again.
+          Porter can show saved screens, but live orders and inventory updates need internet. Check your connection and
+          try again.
         </p>
       </div>
       <OfflineRetry />

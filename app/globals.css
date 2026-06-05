@@ -6,26 +6,32 @@
   /* Porter Fresh Ops — light default (iOS PWA retail SaaS) */
   --po-bg: #fff8ec;
   --po-bg-soft: #fffdf7;
+  --po-bg-warm: #fff4df;
   --po-surface: #ffffff;
   --po-surface-raised: #fffaf1;
+  --po-surface-glass: rgba(255, 255, 255, 0.78);
   --po-surface-green: #f0f9f2;
   --po-surface-orange: #fff1df;
 
   --po-text: #111827;
-  --po-text-soft: #374151;
+  --po-text-soft: #344054;
   --po-muted: #667085;
   --po-muted-2: #98a2b3;
+  --po-placeholder: #9aa4b2;
 
   --po-line: #eadfce;
   --po-line-strong: #dac9af;
+  --po-line-soft: rgba(234, 223, 206, 0.58);
 
   --po-primary: #0f7a3a;
   --po-primary-hover: #0b6930;
   --po-primary-pressed: #07592a;
   --po-primary-soft: #e7f6eb;
+  --po-primary-ring: rgba(15, 122, 58, 0.24);
 
   --po-whatsapp: #25d366;
   --po-whatsapp-dark: #128c7e;
+  --po-whatsapp-soft: #e9fbee;
 
   --po-accent: #f26b00;
   --po-accent-hover: #d85f00;
@@ -45,15 +51,17 @@
 
   --po-focus: #0f7a3a;
 
-  --po-shadow-card: 0 12px 30px rgba(15, 122, 58, 0.08);
+  --po-shadow-card: 0 10px 28px rgba(17, 24, 39, 0.06);
+  --po-shadow-card-hover: 0 16px 36px rgba(17, 24, 39, 0.09);
   --po-shadow-floating: 0 18px 48px rgba(17, 24, 39, 0.12);
   --po-shadow-sheet: 0 -18px 48px rgba(17, 24, 39, 0.14);
 
   --po-radius-xs: 10px;
   --po-radius-sm: 14px;
   --po-radius-md: 18px;
-  --po-radius-lg: 24px;
-  --po-radius-xl: 30px;
+  --po-radius-lg: 22px;
+  --po-radius-xl: 28px;
+  --po-radius-2xl: 34px;
   --po-radius-pill: 999px;
 
   /* Backward-compatible aliases (migrate away over time) */
