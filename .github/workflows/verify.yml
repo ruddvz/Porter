@@ -9,6 +9,19 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      CI: "true"
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-dummy-service-role-key
+      PORTER_CREDENTIAL_SECRET: ci-dummy-credential-secret-at-least-32-chars
+      PORTER_IMPERSONATION_SECRET: ci-dummy-impersonation-secret-at-least-32-chars
+      PUSH_INTERNAL_SECRET: ci-dummy-push-secret
+      CRON_SECRET: ci-dummy-cron-secret
+      RAZORPAY_WEBHOOK_SECRET: ci-dummy-razorpay-webhook-secret
+      META_APP_SECRET: ci-dummy-meta-app-secret
+      META_WEBHOOK_VERIFY_TOKEN: ci-verify-token
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,4 +33,4 @@ jobs:
       - run: npx playwright install chromium --with-deps
       - run: npm run test:e2e
         env:
-          CI: "true"
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000

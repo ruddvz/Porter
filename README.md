@@ -59,7 +59,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Link project: `supabase link` (or use Dashboard SQL editor).
 2. Run migration: paste `supabase/migrations/001_initial_schema.sql` into **SQL Editor** → Run, or use `supabase db push` if CLI is configured.
-3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql`, then **`006_plan_complete.sql`** (full rollout: products + orders `preparing`, seller fields, `platform_settings`, push tables, storage bucket), then **`007_order_items_seller_id.sql`** (denormalizes `seller_id` on `order_items` for realtime line-item updates), then **`008_seller_delivery_extras.sql`** (seller timezone, minimum order, delivery fee, off-hours message), then **`009_order_events.sql`** (`order_events` audit trail + optional `meta_access_token_enc`), then **`010_phase4_platform_events_track_loyalty.sql`**, **`011_referral_codes.sql`**, **`012_realtime_platform_events.sql`** (admin live feed), then **`013_conversation_messages.sql`** (WhatsApp thread persistence + Realtime for seller Chats), then **`014_products_sort_order.sql`** (manual product ordering / drag reorder), then **`018_webhook_idempotency.sql`** (deduplicate WhatsApp/Razorpay webhooks). If you previously applied **`006_product_fields_and_order_preparing.sql`** only, compare with `006_plan_complete.sql` and apply any missing pieces (do not run duplicate conflicting `ALTER`s blindly).
+3. Apply follow-up migrations in order: `003_admin.sql`, `004_seller_bot_settings.sql`, `005_conversation_nudge.sql`, then **`006_plan_complete.sql`** (full rollout: products + orders `preparing`, seller fields, `platform_settings`, push tables, storage bucket), then **`007_order_items_seller_id.sql`** (denormalizes `seller_id` on `order_items` for realtime line-item updates), then **`008_seller_delivery_extras.sql`** (seller timezone, minimum order, delivery fee, off-hours message), then **`009_order_events.sql`** (`order_events` audit trail + optional `meta_access_token_enc`), then **`010_phase4_platform_events_track_loyalty.sql`**, **`011_referral_codes.sql`**, **`012_realtime_platform_events.sql`** (admin live feed), then **`013_conversation_messages.sql`** (WhatsApp thread persistence + Realtime for seller Chats), then **`014_products_sort_order.sql`** (manual product ordering / drag reorder), then **`015_storefront_openwa_inventory_ledger.sql`** (public `store_slug`, OpenWA columns, `inventory_movements` / `stock_reservations`), then **`016_categories_product_slugs.sql`** (`categories` table, `product_slug`, category backfill), then **`017_seller_auto_commit_inventory.sql`** (`auto_commit_inventory_on_payment` on sellers), then **`018_webhook_idempotency.sql`** (`webhook_events` table for duplicate-safe WhatsApp/Razorpay delivery). If you previously applied **`006_product_fields_and_order_preparing.sql`** only, compare with `006_plan_complete.sql` and apply any missing pieces (do not run duplicate conflicting `ALTER`s blindly).
 
    **Note:** Session 5 was originally named `002_conversation_nudge.sql`; that collided with other `002` migrations. Use **`005_conversation_nudge.sql`** only. If you already ran the old file, skip `005` — the `ALTER` is idempotent.
 
@@ -93,7 +93,19 @@ npm install
 npm run dev
 ```
 
-**Meta verify token:** set `META_WEBHOOK_VERIFY_TOKEN` in `.env.local` (must match Meta dashboard). You may also set `META_VERIFY_TOKEN` to the same value — the app accepts either for the GET verify handshake. Per-seller WhatsApp API tokens live on the `sellers` row, not in env (see `.env.example`).
+**Meta verify token:** set `META_WEBHOOK_VERIFY_TOKEN` in `.env.local` (must match Meta dashboard). You may also set `META_VERIFY_TOKEN` to the same value — the app accepts either for the GET verify handshake. **`META_APP_SECRET`** validates POST webhook `X-Hub-Signature-256` (required in production). Per-seller WhatsApp API tokens live on the `sellers` row, not in env (see `.env.example`).
+
+**Admin impersonation:** set `PORTER_IMPERSONATION_SECRET` to a long random string (32+ chars). Required in production if you do not want fallback to the service role key. Rotating it invalidates active impersonation sessions.
+
+## Testing
+
+```bash
+npm ci
+npm run verify          # lint + typecheck + unit tests + build
+npm run test:e2e        # Playwright smoke (starts dev server locally)
+```
+
+CI runs the same on push to `main` and `cursor/**` branches. See [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
 
 **Push:** set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `PUSH_INTERNAL_SECRET` in Vercel for Web Push. **Encryption:** set `PORTER_CREDENTIAL_SECRET` (32+ char random) before using “encrypt at rest” on payment fields.
 
