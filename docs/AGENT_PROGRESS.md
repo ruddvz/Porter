@@ -1,35 +1,26 @@
 # Porter agent progress
 
-**Branch:** `cursor/ios26-pixel-perfect-ui-cbb5`  
+**Branch:** `cursor/storefront-admin-remainder-cbb5`  
 **Plan:** [PORTER_IOS26_PIXEL_PERFECT_UI_UX_AGENT_PLAN.md](./PORTER_IOS26_PIXEL_PERFECT_UI_UX_AGENT_PLAN.md)
 
-## iOS 26 Pixel-Perfect UI/UX — 2026-06-05 (final audit pass)
+## Remaining plan items — 2026-06-05
 
-### Phases completed
+### Completed in this pass
 
-| Phase | Status | Proof |
-|-------|--------|-------|
-| 1 GitHub Pages launcher | Done | Light `docs/index.html`, inject script, safe-area padding |
-| 2 Tokens & primitives | Done | `globals.css`, HeroCard, MetricCard, ListRow, badges, Field, Loading/Error states |
-| 3 iOS app shell | Done | Floating pill nav, TopBar mobile sheets (viewport-gated), More sheet + logout |
-| 4 Auth & onboarding | Done | 5-step wizard, WhatsApp advanced hidden |
-| 5 Live orders | Done | Urgent HeroCard, metrics grid, light chart in DashboardHomeInsights |
-| 6–8 Inventory/storefront/tracking | Done | Operational font-display removed; tracking light; storefront pill cart + success |
-| 9–10 Chats/analytics/settings/admin | Done | Analytics/settings/inventory metrics use system tabular nums |
-| 11 PWA | Done | Offline copy, manifest `#fff8ec` |
-| 12 QA & docs | Done | Legal pages, `app/not-found.tsx`, receipt print light theme |
+| Item | Status |
+|------|--------|
+| `components/storefront/*` extraction | Done — StoreHeader, CategoryStrip, ProductCard, CartBar, CartSheet, CheckoutSheet, StoreEmptyState, StorefrontSuccess |
+| Full storefront checkout | Done — pickup/delivery, address, area, COD/online payment, notes, min-order validation |
+| Delivery fee in order total | Done — `lib/public-store-order.ts` adds seller delivery fee server-side |
+| Admin mobile cards | Done — `TableToCards` + sellers/orders mobile layouts |
+| Expanded screenshot script | Done — more routes/viewports in `scripts/capture-ui-redesign-screenshots.mjs` |
 
-### Final audit fixes (this pass)
+### Storefront flow
 
-- **Privacy/Terms**: migrated from dark `text-white` to `LegalPageShell` (760px, line-height 1.7)
-- **404**: branded `app/not-found.tsx` with dashboard + home CTAs
-- **Dashboard chart**: Recharts grid/tooltip/gradient use Porter light tokens (was dark `#111` / `#2a2a2a`)
-- **Urgent action card**: HeroCard at top of live orders board
-- **TopBar**: bell/profile drawers only on mobile (`max-width: 1023px`) — no double overlay on desktop
-- **MobileMoreSheet**: 28px radius, drag handle, Help + Log out, safe-area padding
-- **Bottom spacer**: `--app-bottom-nav-height: 86px` for floating pill nav clearance
-- **Print receipt**: light `#fff8ec` theme in OrderDetailPanel
-- **docs/status.html**: legacy class compatibility in `style.css`
+1. Browse products with category chips + search + quantity steppers  
+2. **CartBar** → **CartSheet** (line items, subtotal)  
+3. **CheckoutSheet** (fulfillment, contact, payment, notes)  
+4. **StorefrontSuccess** with track link  
 
 ### Commands
 
@@ -38,11 +29,6 @@
 | `npm run verify` | pass |
 | `npm run test:e2e` | pass (42 tests) |
 
-### Screenshots
+### Still owner-only
 
-- `docs/screenshots/ui-redesign/after/` — home, login, offline @ 390px; design-system @ 1280px
-
-### Owner-only deferred
-
-- Physical iPhone installed-PWA manual sign-off
-- Full screenshot matrix for every dashboard sub-route on device hardware
+- Physical iPhone installed-PWA manual sign-off on hardware

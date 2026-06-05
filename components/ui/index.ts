@@ -13,6 +13,8 @@ export { StatCard } from "./StatCard";
 export type { StatCardProps } from "./StatCard";
 export { Table } from "./Table";
 export type { SortDir, TableColumn, TableProps } from "./Table";
+export { TableToCards } from "./TableToCards";
+export type { TableToCardsProps } from "./TableToCards";
 export { Modal } from "./Modal";
 export type { ModalProps } from "./Modal";
 export { Drawer } from "./Drawer";

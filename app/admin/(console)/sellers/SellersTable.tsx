@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Table } from "@/components/ui/Table";
+import { TableToCards } from "@/components/ui/TableToCards";
+import { Badge } from "@/components/ui/Badge";
 import type { Seller } from "@/types";
 import { MoreHorizontal } from "lucide-react";
 import Link from "next/link";
@@ -91,6 +93,32 @@ export default function SellersTable({
         </div>
       </div>
 
+      <TableToCards
+        rows={rows}
+        getRowKey={(s) => s.id}
+        renderCard={(s) => (
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <Link href={`/admin/sellers/${s.id}`} className="text-base font-semibold text-porter-green-600 hover:underline">
+                {s.store_name}
+              </Link>
+              <Badge
+                kind="status"
+                variant={s.is_active ? "paid" : "cancelled"}
+                label={s.is_active ? "Active" : "Inactive"}
+                size="sm"
+              />
+            </div>
+            <p className="text-sm text-porter-text-muted">{s.city ?? "—"} · {s.plan}</p>
+            <p className="text-mono text-xs text-porter-text-secondary">{s.whatsapp_number}</p>
+            <Link href={`/admin/sellers/${s.id}`} className="text-sm font-semibold text-porter-green-600">
+              View seller →
+            </Link>
+          </div>
+        )}
+      />
+
+      <div className="hidden lg:block">
       <Table
         columns={[
           {
@@ -156,6 +184,7 @@ export default function SellersTable({
         emptyTitle="No sellers match"
         emptyDescription="Try widening your search."
       />
+      </div>
 
       <div className="flex items-center justify-between text-sm text-porter-text-muted">
         <span>
