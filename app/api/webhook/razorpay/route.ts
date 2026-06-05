@@ -1,22 +1,13 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac } from "crypto";
 import { waitUntil } from "@vercel/functions";
 import { insertOrderEvent } from "@/lib/order-events";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { maybeCommitInventoryAfterPayment } from "@/lib/razorpay-inventory";
+import { verifyRazorpayWebhookSignature } from "@/lib/razorpay-webhook-signature";
 import { sendMessage } from "@/lib/whatsapp";
 import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 
 export const runtime = "nodejs";
-
-function verifySignature(rawBody: string, signature: string | null, secret: string): boolean {
-  if (!signature) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  try {
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch {
-    return false;
-  }
-}
 
 function normalizePhone(p: string): string {
   const digits = p.replace(/\D/g, "");
@@ -185,7 +176,7 @@ export async function POST(req: Request) {
 
   const rawBody = await req.text();
   const sig = req.headers.get("x-razorpay-signature");
-  if (!verifySignature(rawBody, sig, secret)) {
+  if (!verifyRazorpayWebhookSignature(rawBody, sig, secret)) {
     return new Response("Invalid signature", { status: 400 });
   }
 

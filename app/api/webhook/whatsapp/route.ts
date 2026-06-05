@@ -1,6 +1,10 @@
 import { waitUntil } from "@vercel/functions";
 import { appendConversationMessage, normalizeCustomerPhone } from "@/lib/conversation-messages";
 import { getSellerByMetaPhoneNumberId, handleIncomingCustomerMessage } from "@/lib/conversation";
+import {
+  requireMetaWebhookSignatureInProduction,
+  verifyMetaWebhookSignature,
+} from "@/lib/meta-webhook-signature";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 import type { MetaWebhookPayload } from "@/types";
@@ -21,9 +25,25 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const rawBody = await req.text();
+  const appSecret = process.env.META_APP_SECRET;
+  const sig = req.headers.get("x-hub-signature-256");
+
+  if (requireMetaWebhookSignatureInProduction()) {
+    if (!appSecret) {
+      console.error("[whatsapp-webhook] META_APP_SECRET missing in production");
+      return new Response("Server misconfigured", { status: 500 });
+    }
+    if (!verifyMetaWebhookSignature(rawBody, sig, appSecret)) {
+      return new Response("Invalid signature", { status: 401 });
+    }
+  } else if (appSecret && sig && !verifyMetaWebhookSignature(rawBody, sig, appSecret)) {
+    return new Response("Invalid signature", { status: 401 });
+  }
+
   let payload: MetaWebhookPayload;
   try {
-    payload = (await req.json()) as MetaWebhookPayload;
+    payload = JSON.parse(rawBody) as MetaWebhookPayload;
   } catch {
     return new Response("Bad Request", { status: 400 });
   }
