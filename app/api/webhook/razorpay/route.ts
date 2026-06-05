@@ -4,6 +4,7 @@ import { insertOrderEvent } from "@/lib/order-events";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { maybeCommitInventoryAfterPayment } from "@/lib/razorpay-inventory";
 import { sendMessage } from "@/lib/whatsapp";
+import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 
 export const runtime = "nodejs";
 
@@ -197,7 +198,18 @@ export async function POST(req: Request) {
 
   const ev = event.event;
   const payload = event.payload ?? {};
-  console.log(JSON.stringify({ scope: "razorpay-webhook", event: ev ?? null }));
+  const entity =
+    (payload as { payment?: { entity?: { id?: string } } }).payment?.entity ??
+    (payload as { payment_link?: { entity?: { id?: string } } }).payment_link?.entity;
+  const externalId = `${ev ?? "unknown"}:${entity?.id ?? createHmac("sha256", secret).update(rawBody).digest("hex").slice(0, 24)}`;
+  const supabase = createSupabaseServiceRoleClient();
+  const shouldProcess = await claimWebhookEvent(supabase, "razorpay", externalId);
+  if (!shouldProcess) {
+    console.log(JSON.stringify({ scope: "razorpay-webhook", duplicate: true, externalId }));
+    return new Response("OK", { status: 200 });
+  }
+
+  console.log(JSON.stringify({ scope: "razorpay-webhook", event: ev ?? null, externalId }));
 
   if (ev === "payment_link.paid") {
     const pl = (event as { payment_link?: { entity?: { id?: string } } }).payment_link;

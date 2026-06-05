@@ -1,4 +1,5 @@
 import { apiErr, apiOk } from "@/lib/api-json";
+import { IMPERSONATION_COOKIE_NAME, signImpersonationCookie } from "@/lib/impersonation-cookie";
 import { cookies } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -29,7 +30,13 @@ export async function POST(req: Request) {
   if (!seller) return apiErr("Seller not found", 404, "404");
 
   const cookieStore = await cookies();
-  cookieStore.set("porter_admin_impersonate", sellerId, {
+  let signed: string;
+  try {
+    signed = signImpersonationCookie(sellerId, user.id);
+  } catch {
+    return apiErr("Impersonation not configured", 500);
+  }
+  cookieStore.set(IMPERSONATION_COOKIE_NAME, signed, {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
@@ -60,7 +67,7 @@ export async function DELETE() {
   if (!adminRow) return apiErr("Forbidden", 403, "403");
 
   const cookieStore = await cookies();
-  cookieStore.delete("porter_admin_impersonate");
+  cookieStore.delete(IMPERSONATION_COOKIE_NAME);
 
   const { logPlatformEvent } = await import("@/lib/log-platform-event");
   await logPlatformEvent({

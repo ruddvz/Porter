@@ -2,6 +2,7 @@ import { waitUntil } from "@vercel/functions";
 import { appendConversationMessage, normalizeCustomerPhone } from "@/lib/conversation-messages";
 import { getSellerByMetaPhoneNumberId, handleIncomingCustomerMessage } from "@/lib/conversation";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
+import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 import type { MetaWebhookPayload } from "@/types";
 
 export const runtime = "nodejs";
@@ -39,6 +40,13 @@ export async function POST(req: Request) {
     return new Response("OK", { status: 200 });
   }
 
+  const messageId = msg.id ?? `${phoneNumberId}:${from}:${msg.timestamp ?? Date.now()}`;
+  const supabase = createSupabaseServiceRoleClient();
+  const shouldProcess = await claimWebhookEvent(supabase, "whatsapp_meta", messageId);
+  if (!shouldProcess) {
+    return new Response("OK", { status: 200 });
+  }
+
   waitUntil(
     (async () => {
       const seller = await getSellerByMetaPhoneNumberId(phoneNumberId);
@@ -47,7 +55,6 @@ export async function POST(req: Request) {
         return;
       }
       const phone = normalizeCustomerPhone(from);
-      const supabase = createSupabaseServiceRoleClient();
       const { count: orderCount } = await supabase
         .from("orders")
         .select("*", { count: "exact", head: true })
