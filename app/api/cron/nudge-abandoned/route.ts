@@ -1,3 +1,4 @@
+import { nudgeMessageForState } from "@/lib/whatsapp-templates";
 import { sendMessage } from "@/lib/whatsapp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import type { Conversation, ConversationContext, Seller } from "@/types";
@@ -90,41 +91,8 @@ export async function GET(req: Request) {
 
     const ctx = (row.context as ConversationContext) ?? {};
     const phone = row.customer_phone;
-    let message = "";
-
-    if (row.state === "collecting_payment_method") {
-      const items = ctx.items ?? [];
-      const total = ctx.order_total ?? 0;
-      if (!items.length) {
-        message = `Hi! 👋 Were you trying to order from ${s.store_name}?
-Just send me your grocery list and I'll sort it out! 🛒
-Example: '5kg aloo, 2L tael, amul butter'`;
-      } else {
-        const top = items.slice(0, 3).map((i) => `• ${i.product_name} — ${i.quantity} ${i.unit}`);
-        message = `Your order is still waiting! 🛒
-${top.join("\n")}
-💰 Total: ₹${total}
-
-How do you want to pay?
-1️⃣ Online (UPI/Card)
-2️⃣ Cash on Delivery`;
-      }
-    } else if (row.state === "collecting_items") {
-      message = `Hi! 👋 Were you trying to order from ${s.store_name}?
-Just send me your grocery list and I'll sort it out! 🛒
-Example: '5kg aloo, 2L tael, amul butter'`;
-    } else if (row.state === "collecting_area") {
-      const zones = (s.delivery_zones ?? []).filter(Boolean).join(", ");
-      message = `Still there? 📍
-Just tell me your delivery area to confirm your order.
-${zones || "Send your area name."}`;
-    } else if (row.state === "collecting_address") {
-      message = `Almost done! 🏠
-Just send your building name + flat/house number and your order is confirmed.`;
-    } else if (row.state === "awaiting_payment") {
-      message = `Still there? 💳
-Your payment link is waiting — complete payment when you're ready, or reply if you need help.`;
-    } else {
+    const message = nudgeMessageForState(row.state, s, ctx);
+    if (!message) {
       skipped++;
       continue;
     }

@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import type { OrderWithItems } from "@/lib/orders-ui";
-import { formatCurrencyInr } from "@/lib/orders-ui";
+import { formatCurrencyInr, orderStatusBadge } from "@/lib/orders-ui";
 import type { Product } from "@/types";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -101,7 +101,7 @@ export default function DashboardHomeInsights({
               >
                 <span className="font-mono text-porter-text-secondary">#{o.id.slice(0, 8)}</span>
                 <span className="text-porter-text-primary">{o.customer_name ?? o.customer_phone}</span>
-                <span className="text-porter-text-muted">{o.status}</span>
+                <Badge kind="status" variant={orderStatusBadge(o.status).variant} label={orderStatusBadge(o.status).label} size="sm" />
                 <span className="font-semibold text-porter-text-primary">{formatCurrencyInr(Number(o.total_amount ?? 0))}</span>
               </li>
             ))

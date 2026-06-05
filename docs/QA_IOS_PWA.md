@@ -34,7 +34,9 @@ Automated checks cover layout overflow and route smoke tests (Playwright iPhone 
 
 ## Screenshots
 
-Place device screenshots under `docs/screenshots/pwa/` with filenames like `dashboard-home-safari-375.png`.
+Automated reference captures live in `docs/screenshots/pwa/` (regenerate with `npm run screenshots:pwa`).
+
+For release sign-off, add physical device files such as `dashboard-home-safari-375.png` alongside the automated set.
 
 ## Install / SW / push
 

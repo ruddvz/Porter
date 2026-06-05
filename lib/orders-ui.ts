@@ -1,4 +1,5 @@
 import type { BadgeStatusVariant } from "@/components/ui/Badge";
+import { orderStatusLabel } from "@/lib/order-status-transitions";
 import type { Order, OrderStatus } from "@/types";
 
 export type OrderWithItems = Order & { order_items?: import("@/types").OrderItem[] };
@@ -9,23 +10,24 @@ export function formatCurrencyInr(amount: number | null | undefined): string {
 }
 
 export function orderStatusBadge(status: OrderStatus): { label: string; variant: BadgeStatusVariant } {
+  const label = orderStatusLabel(status);
   switch (status) {
     case "pending":
-      return { label: "Pending", variant: "unpaid" };
+      return { label, variant: "unpaid" };
     case "confirmed":
-      return { label: "Confirmed", variant: "dispatched" };
+      return { label, variant: "dispatched" };
     case "preparing":
-      return { label: "Preparing", variant: "dispatched" };
+      return { label, variant: "dispatched" };
     case "paid":
-      return { label: "Paid", variant: "paid" };
+      return { label, variant: "paid" };
     case "out_for_delivery":
-      return { label: "Out for delivery", variant: "dispatched" };
+      return { label, variant: "dispatched" };
     case "delivered":
-      return { label: "Delivered", variant: "delivered" };
+      return { label, variant: "delivered" };
     case "cancelled":
-      return { label: "Cancelled", variant: "cancelled" };
+      return { label, variant: "cancelled" };
     default:
-      return { label: status, variant: "unpaid" };
+      return { label, variant: "unpaid" };
   }
 }
 

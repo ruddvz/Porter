@@ -132,7 +132,7 @@ Small shops already sell on WhatsApp, but **copy-pasting orders**, **chasing add
 ## Contributing
 
 1. **Fork** the repository and create a branch from `main` for your change.
-2. **Install and verify** — `npm install`, `npm run lint`, and `npm run build` when your change touches app code.
+2. **Install and verify** — `npm ci` and `npm run verify` when your change touches app code.
 3. **Keep migrations ordered** — append new SQL under `supabase/migrations/` with the next sequence number; document any manual steps in your PR.
 4. **Open a pull request** with a short description of the problem, the approach, and any env or Supabase changes reviewers need.
 5. **Security** — do not commit secrets; use `.env.local` only on your machine.

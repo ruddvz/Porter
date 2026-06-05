@@ -20,7 +20,7 @@ export function canTransitionOrderStatus(from: OrderStatus, to: OrderStatus): bo
 export function orderStatusLabel(status: OrderStatus): string {
   switch (status) {
     case "pending":
-      return "New";
+      return "Pending";
     case "confirmed":
       return "Confirmed";
     case "preparing":

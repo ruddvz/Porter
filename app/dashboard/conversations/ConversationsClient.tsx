@@ -5,16 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SELLER_QUICK_REPLIES } from "@/lib/whatsapp-templates";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { ConversationMessage, Seller } from "@/types";
 import { ArrowLeft, MessageCircle, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-const QUICK_REPLIES = [
-  "Your order is ready ✅",
-  "Out of delivery area",
-  "What's your address?",
-];
 
 function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -155,7 +151,11 @@ export default function ConversationsClient({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {rows.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-porter-text-muted">No conversations yet.</p>
+            <EmptyState
+              title="No conversations yet"
+              description="When customers message your WhatsApp number, threads will appear here."
+              className="min-h-[200px]"
+            />
           ) : (
             <ul className="divide-y divide-porter-bg-border">
               {rows.map((r) => {
@@ -250,7 +250,7 @@ export default function ConversationsClient({
 
             <div className="shrink-0 border-t border-porter-bg-border bg-porter-bg-base/80 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:px-4">
               <div className="mb-2 flex flex-wrap gap-2">
-                {QUICK_REPLIES.map((q) => (
+                {SELLER_QUICK_REPLIES.map((q) => (
                   <button
                     key={q}
                     type="button"
