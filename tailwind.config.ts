@@ -34,8 +34,8 @@ const config: Config = {
           },
           text: {
             primary: "#E8F5E9",
-            secondary: "#A3B8A8",
-            muted: "#5C7A63",
+            secondary: "#B8CFC0",
+            muted: "#8BA896",
           },
           status: {
             paid: "#25D366",

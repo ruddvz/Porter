@@ -1,8 +1,16 @@
-# PWA manual QA screenshots
+# PWA QA screenshots
 
-Capture after testing on iPhone Safari and installed Home Screen mode:
+| File | Viewport | Route |
+|------|----------|-------|
+| `home-chromium-1280.png` | 1280×720 | `/` |
+| `login-iphone-se-375.png` | 375×667 | `/auth/login` |
+| `offline-iphone-se-375.png` | 375×667 | `/offline` |
 
-- Safari tab — live orders with bottom nav safe spacing
-- Installed PWA — full screen, status bar clear
-- Push permission prompt (Growth plan)
-- Offline fallback (`/offline`)
+Regenerate:
+
+```bash
+npm run build && npm run start
+PLAYWRIGHT_SKIP_WEBSERVER=1 npm run screenshots:pwa
+```
+
+For production sign-off, add physical iPhone Safari + installed PWA captures per `docs/QA_IOS_PWA.md`.

@@ -4,6 +4,7 @@ import { insertOrderEvent } from "@/lib/order-events";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase";
 import { maybeCommitInventoryAfterPayment } from "@/lib/razorpay-inventory";
 import { verifyRazorpayWebhookSignature } from "@/lib/razorpay-webhook-signature";
+import { paymentFailedMessage, paymentReceivedMessage } from "@/lib/whatsapp-templates";
 import { sendMessage } from "@/lib/whatsapp";
 import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 
@@ -72,7 +73,7 @@ async function markOrderPaidFromLink(supabase: ReturnType<typeof createSupabaseS
     .eq("customer_phone", normalizePhone(order.customer_phone as string));
 
   const phone = normalizePhone(order.customer_phone as string);
-  await sendMessage(phone, "✅ Payment received! Your order is being packed. ~30 mins. 🛵", seller);
+  await sendMessage(phone, paymentReceivedMessage(), seller);
   void notifyOrderPush(order.seller_id as string, "Payment received", `₹${order.total_amount} — order ${String(order.id).slice(0, 8)}`);
   await maybeCommitInventoryAfterPayment(order.id as string, seller);
 }
@@ -132,11 +133,7 @@ async function handlePaymentCaptured(payload: { payment?: { entity?: Record<stri
     .eq("seller_id", order.seller_id)
     .eq("customer_phone", normalizePhone(order.customer_phone as string));
 
-  await sendMessage(
-    normalizePhone(order.customer_phone as string),
-    "✅ Payment received! Your order is being packed. ~30 mins. 🛵",
-    seller
-  );
+  await sendMessage(normalizePhone(order.customer_phone as string), paymentReceivedMessage(), seller);
   void notifyOrderPush(order.seller_id as string, "Payment received", `₹${order.total_amount}`);
   await maybeCommitInventoryAfterPayment(order.id as string, seller);
 }
@@ -149,7 +146,7 @@ async function handlePaymentFailed(payload: { payment?: { entity?: Record<string
   if (!order) return;
   const seller = order.sellers as import("@/types").Seller;
   const phone = normalizePhone(order.customer_phone as string);
-  await sendMessage(phone, "Payment nathi thayu. Ferthi payment link par try karo.", seller);
+  await sendMessage(phone, paymentFailedMessage(), seller);
   await insertOrderEvent(supabase, {
     orderId: order.id as string,
     sellerId: order.seller_id as string,

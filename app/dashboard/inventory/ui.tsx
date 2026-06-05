@@ -35,6 +35,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/cn";
+import { slugifyProductName, uniqueProductSlug } from "@/lib/product-slug";
 import InventoryLedgerPanel from "@/components/inventory/InventoryLedgerPanel";
 
 const PRESET_CATEGORIES = ["Vegetables", "Dairy", "Staples", "Beverages", "Snacks", "Household", "Other"];
@@ -341,6 +342,53 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
           <Button type="button" onClick={() => setModal("new")}>
             Add product
           </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              window.location.href = "/api/seller/products/export";
+            }}
+          >
+            Export CSV
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = ".csv,text/csv";
+              input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+                const csv = await file.text();
+                const res = await fetch("/api/seller/products/import", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ csv }),
+                });
+                const json = (await res.json()) as {
+                  data?: { imported?: number; errors?: string[] };
+                  error?: { message?: string };
+                };
+                if (!res.ok) {
+                  toast(json.error?.message ?? "Import failed", "error");
+                  return;
+                }
+                const n = json.data?.imported ?? 0;
+                const errs = json.data?.errors ?? [];
+                toast(
+                  errs.length ? `Imported ${n}. ${errs.length} row issue(s).` : `Imported ${n} product(s).`,
+                  errs.length ? "error" : "success",
+                );
+                const { data } = await supabase.from("products").select("*").eq("seller_id", seller.id);
+                if (data) setProducts(data);
+              };
+              input.click();
+            }}
+          >
+            Import CSV
+          </Button>
         </div>
       </div>
 
@@ -481,7 +529,19 @@ export default function InventoryClient({ seller, initialProducts }: { seller: S
       </div>
       )}
 
-      {sortedFiltered.length === 0 && <EmptyState title="No products match" description="Try a different search or category." />}
+      {products.length === 0 ? (
+        <EmptyState
+          title="No products yet"
+          description="Add your first product so customers can order on WhatsApp and your storefront."
+          action={
+            <Button type="button" onClick={() => setModal("new")}>
+              Add product
+            </Button>
+          }
+        />
+      ) : sortedFiltered.length === 0 ? (
+        <EmptyState title="No products match" description="Try a different search or category." />
+      ) : null}
 
       <InventoryLedgerPanel
         products={products}
@@ -791,6 +851,13 @@ function ProductModal({
     const selectedCat = categoryId ? dbCategories.find((c) => c.id === categoryId) : null;
     const category = selectedCat?.name ?? null;
 
+    const existingSlugs = new Set(
+      (await supabase.from("products").select("product_slug").eq("seller_id", sellerRow.id)).data
+        ?.map((p) => p.product_slug)
+        .filter((s): s is string => !!s) ?? [],
+    );
+    const product_slug = product?.product_slug ?? uniqueProductSlug(slugifyProductName(name.trim()), existingSlugs);
+
     const row = {
       seller_id: sellerRow.id,
       name: name.trim(),
@@ -799,6 +866,7 @@ function ProductModal({
       aliases: aliasChips,
       category,
       category_id: selectedCat?.id ?? null,
+      product_slug,
       price: priceNum,
       unit,
       stock_quantity: listed ? Math.max(1, sq) : 0,

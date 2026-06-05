@@ -1,5 +1,6 @@
-import type { OrderStatus } from "@/types";
+import { orderStatusLabel } from "@/lib/order-status-transitions";
 import type { OrderWithItems } from "@/lib/orders-ui";
+import type { OrderStatus } from "@/types";
 
 export type KanbanColumnId = OrderStatus | "awaiting_payment";
 
@@ -30,7 +31,7 @@ export function columnLabel(s: KanbanColumnId): string {
     case "awaiting_payment":
       return "Awaiting payment";
     case "preparing":
-      return "In progress";
+      return orderStatusLabel("preparing");
     case "paid":
       return "Paid";
     case "out_for_delivery":

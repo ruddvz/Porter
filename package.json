@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\" --ignore-path .gitignore",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "screenshots:pwa": "node scripts/capture-pwa-screenshots.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
