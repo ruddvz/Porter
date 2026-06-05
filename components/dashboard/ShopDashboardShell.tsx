@@ -99,7 +99,7 @@ export default function ShopDashboardShell({
   return (
     <>
       <Sidebar
-        brand="PORTER"
+        brand="Porter"
         subtitle={seller.store_name}
         userName={seller.store_name}
         items={items}
@@ -131,7 +131,7 @@ export default function ShopDashboardShell({
         <PWAUpdateBanner />
 
         <nav
-          className="fixed bottom-0 left-0 right-0 z-30 border-t border-porter-bg-border bg-porter-bg-base/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+          className="fixed bottom-0 left-0 right-0 z-30 border-t border-porter-bg-border bg-porter-bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[var(--po-shadow-sheet)] backdrop-blur lg:hidden"
           aria-label="Primary"
         >
           <div className="mx-auto flex max-w-lg justify-around px-1 py-2">
@@ -147,13 +147,13 @@ export default function ShopDashboardShell({
                   href={item.href}
                   className={cn(
                     "flex min-h-12 min-w-[4.25rem] flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[10px] font-semibold transition-colors",
-                    active ? "text-porter-green-400" : "text-porter-text-muted hover:text-porter-text-secondary",
+                    active ? "text-porter-green-600" : "text-porter-text-muted hover:text-porter-text-secondary",
                   )}
                 >
                   <span className="relative inline-flex">
                     <Icon className="h-5 w-5" aria-hidden />
                     {item.badge != null && item.badge !== 0 && (
-                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-porter-orange-500 px-1 text-[10px] font-bold text-black">
+                      <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-porter-orange-500 px-1 text-[10px] font-bold text-white">
                         {item.badge}
                       </span>
                     )}

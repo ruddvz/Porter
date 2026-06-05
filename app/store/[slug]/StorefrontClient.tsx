@@ -108,10 +108,10 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
 
   if (placedTrack !== null) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-[#FFFAF2] p-8">
-        <h1 className="text-2xl font-semibold text-[#0F7A3A]">Order placed</h1>
+      <main className="flex min-h-screen flex-col items-center justify-center bg-porter-bg-base p-8">
+        <h1 className="text-2xl font-semibold text-porter-green-500">Order placed</h1>
         {placedTrack ? (
-          <a href={placedTrack} className="mt-6 text-[#0F7A3A] underline">
+          <a href={placedTrack} className="mt-6 font-semibold text-porter-green-600 underline">
             Track order
           </a>
         ) : null}
@@ -120,8 +120,8 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
   }
 
   return (
-    <main className="min-h-screen bg-[#FFFAF2] pb-28 safe-bottom">
-      <header className="border-b border-[#EADFCE] bg-white px-4 py-4 safe-top">
+    <main className="min-h-screen bg-porter-bg-base pb-28 safe-bottom">
+      <header className="safe-top border-b border-porter-bg-border bg-porter-bg-surface px-4 py-4 shadow-card">
         <h1 className="text-xl font-semibold">{store.store_name}</h1>
         <input
           className="mt-3 w-full rounded-lg border px-3 py-2 text-base"
@@ -140,23 +140,23 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center px-6 py-16 text-center">
-          <p className="text-lg font-medium text-[#1a1a1a]">
+          <p className="text-lg font-medium text-porter-text-primary">
             {products.length === 0 ? "No products available" : "No matches for your search"}
           </p>
-          <p className="mt-2 text-sm text-[#555]">
+          <p className="mt-2 text-sm text-porter-text-muted">
             {products.length === 0 ? "Check back soon or message the store on WhatsApp." : "Try a different search term."}
           </p>
         </div>
       ) : (
         <ul className="grid gap-3 p-4 sm:grid-cols-2">
           {filtered.map((p) => (
-            <li key={p.id} className="rounded-xl border bg-white p-4">
-              <p className="font-medium">{p.name}</p>
-              <p className="text-[#0F7A3A]">₹{p.price}</p>
-              <p className="text-xs text-[#555]">{stockDisplayLabel(p.stock_quantity ?? 0)}</p>
+            <li key={p.id} className="rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface p-4 shadow-card">
+              <p className="font-semibold text-porter-text-primary">{p.name}</p>
+              <p className="text-porter-green-600">₹{p.price}</p>
+              <p className="text-xs text-porter-text-muted">{stockDisplayLabel(p.stock_quantity ?? 0)}</p>
               <button
                 type="button"
-                className="mt-2 rounded-lg bg-[#0F7A3A] px-3 py-2 text-base text-white disabled:opacity-50"
+                className="mt-3 min-h-11 rounded-[var(--po-radius-sm)] bg-porter-green-500 px-4 py-2 text-base font-semibold text-white disabled:opacity-50"
                 disabled={!p.in_stock}
                 onClick={() => addToCart(p)}
               >
@@ -168,7 +168,7 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
       )}
 
       {cart.length > 0 ? (
-        <div className="mx-4 mb-4 rounded-xl border bg-white p-3">
+        <div className="mx-4 mb-4 rounded-[var(--po-radius-md)] border border-porter-bg-border bg-porter-bg-surface p-3 shadow-card">
           <p className="text-sm font-semibold">Cart</p>
           <ul className="mt-2 space-y-2">
             {cart.map((l) => (
@@ -200,10 +200,10 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
         </div>
       ) : null}
 
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-4 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-porter-bg-border bg-porter-bg-surface/95 p-4 safe-bottom shadow-[var(--po-shadow-sheet)] backdrop-blur">
         <button
           type="button"
-          className="w-full rounded-xl bg-[#F26B00] py-3 text-base text-white disabled:opacity-50"
+          className="min-h-12 w-full rounded-[var(--po-radius-md)] bg-porter-orange-500 py-3 text-base font-semibold text-white disabled:opacity-50"
           disabled={cart.length === 0}
           onClick={() => setCheckout(true)}
         >
@@ -213,7 +213,7 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
 
       {checkout ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-          <div className="w-full max-w-md space-y-3 rounded-xl bg-white p-6 safe-bottom">
+          <div className="w-full max-w-md space-y-3 rounded-[var(--po-radius-lg)] bg-porter-bg-surface p-6 safe-bottom shadow-modal">
             <input
               className="w-full rounded border px-3 py-2 text-base"
               placeholder="Name"
@@ -232,13 +232,13 @@ export default function StorefrontClient({ store, products }: { store: PublicSto
             {err ? <p className="text-sm text-red-600" role="alert">{err}</p> : null}
             <button
               type="button"
-              className="w-full rounded-lg bg-[#0F7A3A] py-2 text-base text-white"
+              className="min-h-11 w-full rounded-[var(--po-radius-sm)] bg-porter-green-500 py-2 text-base font-semibold text-white"
               disabled={busy}
               onClick={() => void placeOrder()}
             >
               Place order
             </button>
-            <button type="button" className="w-full text-sm text-[#555]" onClick={() => setCheckout(false)}>
+            <button type="button" className="min-h-11 w-full text-sm text-porter-text-muted" onClick={() => setCheckout(false)}>
               Cancel
             </button>
           </div>

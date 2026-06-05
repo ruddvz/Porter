@@ -13,10 +13,12 @@ export default async function OnboardingPage() {
   if (existing) redirect("/dashboard");
 
   return (
-    <main id="main-content" className="mx-auto max-w-lg px-4 py-12">
-      <h1 className="font-['Bebas_Neue',sans-serif] text-4xl text-[#25D366]">Setup your store</h1>
-      <p className="mt-2 text-sm text-white/70">Takes about 2 minutes. You can edit Meta and Razorpay later in Settings.</p>
-      <OnboardingForm />
+    <main id="main-content" className="min-h-screen bg-porter-bg-base px-4 py-8 safe-top">
+      <div className="mx-auto max-w-lg">
+        <h1 className="text-display text-porter-green-600">Set up your store</h1>
+        <p className="mt-2 text-body">About two minutes. You can connect WhatsApp and payments later in Settings.</p>
+        <OnboardingForm />
+      </div>
     </main>
   );
 }

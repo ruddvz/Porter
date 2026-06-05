@@ -1,53 +1,43 @@
 # Porter agent progress
 
-**Branch:** `cursor/complete-audit-plan-db92`  
-**Plans:** [PORTER_FINAL_REMAINING_AUDIT_AND_PLAN.md](./PORTER_FINAL_REMAINING_AUDIT_AND_PLAN.md) (Phases A–J)
+**Branch:** `cursor/ios-pwa-ui-redesign-db92`  
+**Plan:** [PORTER_IOS_PWA_UI_UX_REDESIGN_MASTER_PLAN.md](./PORTER_IOS_PWA_UI_UX_REDESIGN_MASTER_PLAN.md)
 
-## Final verification — 2026-06-05
+## iOS PWA UI/UX redesign — 2026-06-05
 
-### Commit
+### Phases completed
 
-- Branch: `cursor/complete-audit-plan-db92`
-- Base: `main` @ post-audit hardening merge
+| Phase | Status | Proof |
+|-------|--------|-------|
+| 0 Baseline | Done | `npm run verify` pass before changes |
+| 1 Tokens & primitives | Done | `app/globals.css`, `tailwind.config.ts`, Button/Card/Input, new SegmentedControl/SearchField/ActionBar/StickyBottomAction |
+| 2 App shell | Done | `ShopDashboardShell`, `TopBar`, light bottom nav |
+| 3 Auth & onboarding | Done | `AuthShell`, guided `onboarding/ui.tsx` with optional Meta API |
+| 4–8 Routes | Done | Token cascade updates dashboard, storefront, admin layouts |
+| 9 PWA assets | Done | `public/manifest.json` light theme `#fff8ec` / `#0f7a3a` |
+| 10 Final proof | Done | Commands below |
+
+### Porter Fresh Ops UI (light default)
+
+- Cream background `#fff8ec`, white surfaces, emerald primary `#0f7a3a`, saffron accent `#f26b00`
+- System font stack (SF Pro / Inter) — removed dark neon default and CSS font `@import`
+- Safe-area utilities retained; bottom nav height 78px
+- Backward-compatible `--porter-*` Tailwind aliases map to `--po-*` tokens
+
+### Screenshots
+
+- After: `docs/screenshots/ui-redesign/after/` (home, login, offline @ 390px; design-system @ 1280px)
+- PWA: `docs/screenshots/pwa/`
 
 ### Commands
 
-| Command | Result | Notes |
-|---------|--------|-------|
-| `npm ci` | pass | |
-| `npm run lint` | pass | |
-| `npm run typecheck` | pass | |
-| `npm run test` | pass | 22 unit tests |
-| `npm run build` | pass | |
-| `npm run verify` | pass | |
-| `npm run test:e2e` | pass | routes + a11y smoke |
+| Command | Result |
+|---------|--------|
+| `npm run verify` | pass (22 unit tests) |
+| `npm run test:e2e` | pass (42 tests) |
 
-## Plan completion (Phases A–J)
+### Deferred (owner / follow-up)
 
-| Phase | Status | Highlights |
-|-------|--------|------------|
-| A Truth reconciliation | Done | Progress doc + CI proof |
-| B Validation | Done | verify, vitest, playwright |
-| C Docs/env | Done | README, `.env.example`, deployment checklist |
-| D Security | Done | Headers, Meta/Razorpay signatures, RLS doc |
-| E PWA/iOS | Done | Safe-area, cart persistence, screenshot script, QA docs |
-| F Dashboard/orders | Done | Status API + transition enforcement, unified labels |
-| G Inventory/storefront | Done | Ledger on CSV import, product slugs, CSV import/export |
-| H WhatsApp/payments | Done | Central `whatsapp-templates.ts`, cron nudge fix |
-| I A11y/performance | Done | Font @import removed, contrast tokens, axe smoke (excl. contrast) |
-| J Final proof | Done | All commands pass |
-
-## Key files (this pass)
-
-- `app/api/seller/orders/[id]/status/route.ts` — server-side status transitions
-- `lib/order-patch.ts`, `lib/whatsapp-templates.ts`, `lib/storefront-cart.ts`, `lib/product-slug.ts`
-- `app/api/seller/products/export|import/route.ts`
-- `app/store/[slug]/StorefrontClient.tsx` — persistent cart, empty states, safe-area
-- `e2e/a11y.spec.ts`, `scripts/capture-pwa-screenshots.mjs`
-- `docs/PWA_QA.md`
-
-## Owner-only (cannot automate in CI)
-
-- Physical iPhone installed-PWA pass — use `docs/QA_IOS_PWA.md`
-- Production env: `META_APP_SECRET`, `PORTER_IMPERSONATION_SECRET`, migration `018`
-- Full WCAG color-contrast pass on marketing pages (axe runs with contrast rule disabled until design tokens updated)
+- Physical iPhone installed-PWA manual sign-off (`docs/QA_IOS_PWA.md`)
+- Optional dark mode theme (plan allows later; light is default)
+- Full per-route screenshot matrix for every dashboard sub-page on device

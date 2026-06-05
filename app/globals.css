@@ -3,34 +3,76 @@
 @tailwind utilities;
 
 :root {
-  /* Porter (current product) */
-  --background: #0a0f0d;
-  --foreground: #e8f5e9;
-  --font-dm-sans: "DM Sans", sans-serif;
-  --font-bebas: "Bebas Neue", sans-serif;
-  --font-jetbrains: "JetBrains Mono", monospace;
+  /* Porter Fresh Ops — light default (iOS PWA retail SaaS) */
+  --po-bg: #fff8ec;
+  --po-bg-soft: #fffdf7;
+  --po-surface: #ffffff;
+  --po-surface-raised: #fffaf1;
+  --po-surface-green: #f0f9f2;
+  --po-surface-orange: #fff1df;
 
-  /* Plan0 §1.3 bridge — use with bg-[var(--plan0-bg-base)] etc. when aligning screens */
-  --plan0-bg-base: #0a0a0a;
-  --plan0-bg-surface: #111111;
-  --plan0-bg-elevated: #1a1a1a;
-  --plan0-border: #2a2a2a;
-  --plan0-text-primary: #f5f5f5;
-  --plan0-text-secondary: #a0a0a0;
-  --plan0-accent: #25d366;
-  --plan0-accent-dim: #128c7e;
-  --plan0-radius-sm: 4px;
-  --plan0-radius-md: 8px;
-  --plan0-radius-lg: 12px;
+  --po-text: #111827;
+  --po-text-soft: #374151;
+  --po-muted: #667085;
+  --po-muted-2: #98a2b3;
 
-  /* Plan0 §1 — semantic aliases (bridge to Tailwind porter-* over time) */
-  --bg-base: var(--plan0-bg-base);
-  --bg-surface: var(--plan0-bg-surface);
-  --bg-elevated: var(--plan0-bg-elevated);
-  --border-plan0: var(--plan0-border);
-  --text-primary: var(--plan0-text-primary);
-  --text-secondary: var(--plan0-text-secondary);
-  --accent: var(--plan0-accent);
+  --po-line: #eadfce;
+  --po-line-strong: #dac9af;
+
+  --po-primary: #0f7a3a;
+  --po-primary-hover: #0b6930;
+  --po-primary-pressed: #07592a;
+  --po-primary-soft: #e7f6eb;
+
+  --po-whatsapp: #25d366;
+  --po-whatsapp-dark: #128c7e;
+
+  --po-accent: #f26b00;
+  --po-accent-hover: #d85f00;
+  --po-accent-soft: #fff1df;
+
+  --po-warning: #b77900;
+  --po-warning-soft: #fff6d7;
+
+  --po-danger: #d83b32;
+  --po-danger-soft: #fdecea;
+
+  --po-info: #2563eb;
+  --po-info-soft: #eff6ff;
+
+  --po-success: #15803d;
+  --po-success-soft: #e8f7ee;
+
+  --po-focus: #0f7a3a;
+
+  --po-shadow-card: 0 12px 30px rgba(15, 122, 58, 0.08);
+  --po-shadow-floating: 0 18px 48px rgba(17, 24, 39, 0.12);
+  --po-shadow-sheet: 0 -18px 48px rgba(17, 24, 39, 0.14);
+
+  --po-radius-xs: 10px;
+  --po-radius-sm: 14px;
+  --po-radius-md: 18px;
+  --po-radius-lg: 24px;
+  --po-radius-xl: 30px;
+  --po-radius-pill: 999px;
+
+  /* Backward-compatible aliases (migrate away over time) */
+  --background: var(--po-bg);
+  --foreground: var(--po-text);
+  --bg-base: var(--po-bg);
+  --bg-surface: var(--po-surface);
+  --bg-elevated: var(--po-surface-raised);
+  --border-plan0: var(--po-line);
+  --text-primary: var(--po-text);
+  --text-secondary: var(--po-muted);
+  --accent: var(--po-primary);
+  --plan0-bg-base: var(--po-bg);
+  --plan0-bg-surface: var(--po-surface);
+  --plan0-bg-elevated: var(--po-surface-raised);
+  --plan0-border: var(--po-line);
+  --plan0-text-primary: var(--po-text);
+  --plan0-text-secondary: var(--po-muted);
+  --plan0-accent: var(--po-primary);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -40,13 +82,16 @@
   --sar: var(--safe-right);
   --sab: var(--safe-bottom);
   --sal: var(--safe-left);
-  --app-header-height: 64px;
-  --app-bottom-nav-height: 72px;
 
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(37, 211, 102, 0.08);
-  --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(37, 211, 102, 0.12);
-  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(37, 211, 102, 0.15);
-  --shadow-glow: 0 0 24px rgba(37, 211, 102, 0.2);
+  --app-header-height: 64px;
+  --app-topbar-height: 64px;
+  --app-bottom-nav-height: 78px;
+
+  --shadow-card: var(--po-shadow-card);
+  --shadow-raised: var(--po-shadow-floating);
+  --shadow-modal: var(--po-shadow-sheet);
+  --shadow-glow: var(--po-shadow-card);
+
   --transition-fast: 150ms ease;
   --transition-base: 250ms ease;
   --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -63,9 +108,9 @@
   }
 
   body {
-    @apply min-h-screen bg-porter-bg-base font-sans text-porter-text-primary antialiased;
-    color: var(--foreground);
-    background: var(--background);
+    @apply min-h-screen font-sans antialiased;
+    color: var(--po-text);
+    background: var(--po-bg);
     overscroll-behavior-y: none;
   }
 
@@ -93,13 +138,13 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--plan0-accent);
+    outline: 2px solid var(--po-focus);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: rgba(37, 211, 102, 0.18);
-    color: var(--foreground);
+    background: rgba(15, 122, 58, 0.15);
+    color: var(--po-text);
   }
 }
 
@@ -125,43 +170,60 @@
   }
 
   .text-display {
-    font-family: var(--font-bebas), "Bebas Neue", sans-serif;
-    font-size: 48px;
-    line-height: 1;
-    letter-spacing: 0.05em;
-    font-weight: 400;
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: var(--po-text);
   }
+
   .text-heading {
-    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
     font-size: 24px;
     line-height: 1.25;
     font-weight: 700;
+    color: var(--po-text);
   }
+
   .text-title {
-    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
     font-size: 18px;
     line-height: 1.35;
     font-weight: 600;
+    color: var(--po-text);
   }
+
   .text-body {
-    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
-    font-size: 14px;
-    line-height: 1.625;
+    font-size: 15px;
+    line-height: 1.5;
     font-weight: 400;
+    color: var(--po-text-soft);
   }
+
   .text-label {
-    font-family: var(--font-dm-sans), "DM Sans", sans-serif;
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.35;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+    color: var(--po-muted);
   }
+
   .text-mono {
-    font-family: var(--font-dm-mono), var(--font-geist-mono), var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 13px;
     line-height: 1.45;
     font-weight: 400;
+  }
+
+  .po-card {
+    background: var(--po-surface);
+    border: 1px solid var(--po-line);
+    border-radius: var(--po-radius-md);
+    box-shadow: var(--po-shadow-card);
+  }
+
+  .po-touch {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 
@@ -170,37 +232,9 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.07;
+  opacity: 0.03;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   z-index: 50;
-}
-
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes hero-bubble {
-  0%,
-  10% {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  20%,
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-hero-bubble {
-  animation: hero-bubble 4s ease-in-out infinite;
 }
 
 @keyframes porter-modal-in {
@@ -244,28 +278,4 @@
 
 .animate-porter-modal-sheet {
   animation: porter-modal-sheet-in 0.4s var(--spring) both;
-}
-
-/* Marketing: WhatsApp chat demo sequence (CSS-driven steps) */
-@keyframes wa-chat-cycle {
-  0%,
-  4% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  6%,
-  14% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  16%,
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.wa-bubble {
-  opacity: 0;
-  animation: wa-chat-cycle 16s ease-in-out infinite;
 }
